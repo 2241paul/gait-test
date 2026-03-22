@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>十秒踵趾步态试验 - 颈椎病下肢功能评估</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>十秒踵趾步态试验</h1>
+            <p>足跟贴足尖直线行走，用于评估颈椎病下肢功能</p>
+        </header>
+
+        <main>
+            <div class="status-card" id="statusCard">
+                <div class="timer-display" id="timerDisplay">10</div>
+                <div class="status-text" id="statusText">点击开始测试</div>
+            </div>
+
+            <div class="control-panel">
+                <button class="btn-primary" id="startBtn" onclick="startTest()">开始测试</button>
+                <button class="btn-secondary" id="resetBtn" onclick="resetTest()" style="display: none;">重新测试</button>
+            </div>
+
+            <div class="results-card" id="resultsCard" style="display: none;">
+                <h2>测试结果</h2>
+                <div class="result-item">
+                    <span class="result-label">步频</span>
+                    <span class="result-value" id="cadenceResult">-</span>
+                    <span class="result-unit">步/分钟</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">侧向摆动</span>
+                    <span class="result-value" id="swayResult">-</span>
+                    <span class="result-unit">rad/s</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">步态稳定性</span>
+                    <span class="result-value" id="stabilityResult">-</span>
+                    <span class="result-unit">/100</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">总步数</span>
+                    <span class="result-value" id="stepsResult">-</span>
+                    <span class="result-unit">步</span>
+                </div>
+                <div class="result-item mjora-result">
+                    <span class="result-label">预测mJOA下肢评分</span>
+                    <span class="result-value" id="mjoaResult">-</span>
+                    <span class="result-unit">/4</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">评估等级</span>
+                    <span class="result-value" id="gradeResult">-</span>
+                    <span class="result-unit"></span>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h3>测试说明</h3>
+                <ul>
+                    <li>测试时间为10秒</li>
+                    <li><strong>足跟紧贴足尖，沿直线行走</strong></li>
+                    <li>保持身体平衡，尽可能走直</li>
+                    <li>手机请固定在口袋或腰部</li>
+                    <li>需要至少5米直线空间</li>
+                    <li>测试完成后自动分析结果</li>
+                </ul>
+                <div class="highlight-note">
+                    <strong>临床意义：</strong>踵趾步态对颈脊髓病平衡障碍检测敏感性更高
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>OPLL步态分析研究项目</p>
+        </footer>
+    </div>
+
+    <script src="sensor.js"></script>
+    <script src="gait-analysis.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
