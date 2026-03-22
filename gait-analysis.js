@@ -186,6 +186,15 @@ class GaitAnalyzer {
             amplitudeVariability = (ampStd / ampMean) * 100;
         }
         
+        // 计算加速度RMS（均方根）- 整体运动剧烈程度
+        let accelRMS = 0;
+        if (filteredAccel.length > 10) {
+            const values = filteredAccel.map(d => d.filtered);
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const squaredSum = values.reduce((a, b) => a + (b - mean)**2, 0);
+            accelRMS = Math.sqrt(squaredSum / values.length);
+        }
+        
         // 计算侧向摆动幅度（针对踵趾步态，陀螺仪数据检测左右平衡）
         let lateralSway = 0;
         if (processedData.gyro && processedData.gyro.length > 0) {
@@ -217,6 +226,7 @@ class GaitAnalyzer {
             cycleVariability: parseFloat(cycleVariability.toFixed(1)),
             amplitudeVariability: parseFloat(amplitudeVariability.toFixed(1)),
             lateralSway: parseFloat(lateralSway.toFixed(2)),
+            accelRMS: parseFloat(accelRMS.toFixed(2)),
             stabilityScore: parseFloat(stabilityScore.toFixed(1)),
             estimatedSpeed: parseFloat(estimatedSpeed.toFixed(2))
         };

@@ -20,7 +20,27 @@ const cadenceResult = document.getElementById('cadenceResult');
 const cycleResult = document.getElementById('cycleResult');
 const cvResult = document.getElementById('cvResult');
 const swayResult = document.getElementById('swayResult');
+const rmsResult = document.getElementById('rmsResult');
 const stabilityResult = document.getElementById('stabilityResult');
+
+// 当前结果缓存，用于手动编辑
+let currentResult = null;
+
+// 手动编辑步数
+function editSteps() {
+    if (!currentResult) return;
+    const userInput = prompt('请输入实际数出的步数：', currentResult.params.stepCount);
+    if (userInput === null) return;
+    const newSteps = parseInt(userInput);
+    if (isNaN(newSteps) || newSteps < 0) {
+        alert('请输入有效数字');
+        return;
+    }
+    // 更新参数，重新计算派生参数
+    currentResult.params.stepCount = newSteps;
+    currentResult.params.cadence = parseFloat((newSteps / currentResult.duration * 60).toFixed(1));
+    displayResults(currentResult);
+}
 
 // 开始测试
 async function startTest() {
@@ -150,6 +170,7 @@ function playBeep() {
 
 // 显示结果
 function displayResults(result) {
+    currentResult = result;
     const params = result.params;
     
     stepsResult.textContent = params.stepCount;
@@ -157,6 +178,7 @@ function displayResults(result) {
     cycleResult.textContent = params.avgCycleTime;
     cvResult.textContent = params.cycleVariability;
     swayResult.textContent = params.lateralSway;
+    rmsResult.textContent = params.accelRMS;
     stabilityResult.textContent = params.stabilityScore;
 }
 

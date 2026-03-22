@@ -26,8 +26,8 @@
 
             <div class="results-card" id="resultsCard" style="display: none;">
                 <h2>测试结果</h2>
-                <div class="result-item">
-                    <span class="result-label">总步数</span>
+                <div class="result-item result-item-editable">
+                    <span class="result-label">总步数 <button class="btn-edit" onclick="editSteps()">✏️</button></span>
                     <span class="result-value" id="stepsResult">-</span>
                     <span class="result-unit">步 / 10秒</span>
                 </div>
@@ -52,9 +52,17 @@
                     <span class="result-unit">rad/s</span>
                 </div>
                 <div class="result-item">
+                    <span class="result-label">加速度RMS</span>
+                    <span class="result-value" id="rmsResult">-</span>
+                    <span class="result-unit">m/s²</span>
+                </div>
+                <div class="result-item">
                     <span class="result-label">步态稳定性</span>
                     <span class="result-value" id="stabilityResult">-</span>
                     <span class="result-unit">/100</span>
+                </div>
+                <div class="manual-correction-hint">
+                    如果步数不准，点击✏️手动输入正确步数
                 </div>
             </div>
 
