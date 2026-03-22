@@ -79,16 +79,19 @@ class GaitAnalyzer {
         const accelMean = accelValues.reduce((a, b) => a + b, 0) / accelValues.length;
         const accelVariance = accelValues.reduce((a, b) => a + (b - accelMean)**2, 0) / accelValues.length;
         const accelStd = Math.sqrt(accelVariance);
-        const accelThreshold = accelMean + 0.25 * accelStd; // 进一步降低阈值
+        // 提高阈值，减少静止时噪声误检
+        // 原来0.25std，现在0.4std，静止噪声不会触发
+        const accelThreshold = accelMean + 0.4 * accelStd;
 
         // 陀螺仪计算阈值（绕前后轴摆动，迈步时会有峰值）
-        let gyroThreshold = 0.5;
+        let gyroThreshold = 0.8;
         if (filteredGyro.length > 10) {
             const gyroValues = filteredGyro.map(d => d.filtered);
             const gyroMean = gyroValues.reduce((a, b) => a + b, 0) / gyroValues.length;
             const gyroVariance = gyroValues.reduce((a, b) => a + (b - gyroMean)**2, 0) / gyroValues.length;
             const gyroStd = Math.sqrt(gyroVariance);
-            gyroThreshold = gyroMean + 0.5 * gyroStd;
+            // 提高阈值，减少噪声误检
+            gyroThreshold = gyroMean + 0.8 * gyroStd;
         }
 
         // 融合检测：任一传感器检测到峰值即为一步

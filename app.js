@@ -21,8 +21,6 @@ const cycleResult = document.getElementById('cycleResult');
 const cvResult = document.getElementById('cvResult');
 const swayResult = document.getElementById('swayResult');
 const stabilityResult = document.getElementById('stabilityResult');
-const mjoaResult = document.getElementById('mjoaResult');
-const gradeResult = document.getElementById('gradeResult');
 
 // 开始测试
 async function startTest() {
@@ -138,7 +136,6 @@ function playBeep() {
 // 显示结果
 function displayResults(result) {
     const params = result.params;
-    const mjPred = result.mjPrediction;
     
     stepsResult.textContent = params.stepCount;
     cadenceResult.textContent = params.cadence;
@@ -146,10 +143,6 @@ function displayResults(result) {
     cvResult.textContent = params.cycleVariability;
     swayResult.textContent = params.lateralSway;
     stabilityResult.textContent = params.stabilityScore;
-    mjoaResult.textContent = `${mjPred.score} (${mjPred.description})`;
-    
-    gradeResult.textContent = result.grade.text;
-    gradeResult.className = `result-value ${result.grade.className}`;
 }
 
 // 重置测试
