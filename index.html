@@ -3,102 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>十秒踵趾步态试验 - 颈椎病下肢功能评估</title>
+    <title>GaitOmics - 步态组学 | 10秒踵趾步态平衡测试</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
+        <!-- 头部 -->
         <header>
-            <h1>十秒踵趾步态平衡测试</h1>
-            <p>手握手机行走，检测平衡稳定性评估颈椎病</p>
+            <h1>GaitOmics - 步态组学</h1>
+            <p class="subtitle">10秒踵趾步态平衡测试</p>
         </header>
 
         <main>
+            <!-- 主测试区：大圆圈倒计时 -->
             <div class="status-card" id="statusCard">
-                <div class="timer-display" id="timerDisplay">10</div>
-                <div class="status-text" id="statusText">点击开始测试</div>
+                <div class="timer-circle" id="timerCircle">
+                    <div class="timer-display" id="timerDisplay">10</div>
+                </div>
+                <div class="status-text" id="statusText">点击下方按钮开始测试</div>
             </div>
 
-            <div class="control-panel">
-                <button class="btn-primary" id="startBtn" onclick="startTest()">开始测试</button>
-                <button class="btn-secondary" id="resetBtn" onclick="resetTest()" style="display: none;">重新测试</button>
+            <!-- 实时波形区（测试进行时显示） -->
+            <div class="waveform-card" id="waveformCard" style="display: none;">
+                <canvas id="waveformCanvas"></canvas>
+                <div class="waveform-legend">
+                    <span class="legend-item"><span class="legend-dot legend-x"></span>X轴</span>
+                    <span class="legend-item"><span class="legend-dot legend-y"></span>Y轴</span>
+                    <span class="legend-item"><span class="legend-dot legend-z"></span>Z轴</span>
+                </div>
             </div>
 
+            <!-- 控制面板 -->
+            <div class="control-panel" id="controlPanel">
+                <button class="btn-primary" id="startBtn" onclick="app.startTest()">开始测试</button>
+                <button class="btn-secondary" id="resetBtn" onclick="app.resetTest()" style="display: none;">重新测试</button>
+            </div>
+
+            <!-- 结果报告区 -->
             <div class="results-card" id="resultsCard" style="display: none;">
-                <h2>平衡测试结果</h2>
-                <div class="result-item result-item-editable">
-                    <span class="result-label">总步数 <button class="btn-edit" onclick="editSteps()">✏️</button></span>
-                    <span class="result-value" id="stepsResult">-</span>
-                    <span class="result-unit">步 / 10秒</span>
+                <h2>测试结果</h2>
+                <div class="result-summary">
+                    <div class="result-item">
+                        <span class="result-label">总步数</span>
+                        <div class="result-value-wrap">
+                            <span class="result-value" id="stepsResult">-</span>
+                            <button class="btn-edit" id="editStepsBtn" onclick="app.editSteps()">校正</button>
+                        </div>
+                        <span class="result-unit">步</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">步频</span>
+                        <span class="result-value" id="cadenceResult">-</span>
+                        <span class="result-unit">步/分钟</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">平衡指数</span>
+                        <span class="result-value" id="stabilityResult">-</span>
+                        <span class="result-unit">/ 100</span>
+                    </div>
                 </div>
-                <div class="result-item">
-                    <span class="result-label">步频</span>
-                    <span class="result-value" id="cadenceResult">-</span>
-                    <span class="result-unit">步/分钟</span>
+
+                <!-- 详细参数展开区 -->
+                <button class="btn-detail-toggle" id="detailToggleBtn" onclick="app.toggleDetailParams()">
+                    <span id="detailToggleText">详细参数</span>
+                    <span class="toggle-arrow" id="detailToggleArrow">+</span>
+                </button>
+                <div class="detail-params" id="detailParams" style="display: none;">
+                    <!-- 时域参数 -->
+                    <div class="param-group">
+                        <div class="param-group-header" onclick="app.toggleParamGroup(this)">
+                            <span class="param-group-title">时域参数</span>
+                            <span class="param-group-arrow">+</span>
+                        </div>
+                        <div class="param-group-content" id="timeDomainParams"></div>
+                    </div>
+                    <!-- 频域参数 -->
+                    <div class="param-group">
+                        <div class="param-group-header" onclick="app.toggleParamGroup(this)">
+                            <span class="param-group-title">频域参数</span>
+                            <span class="param-group-arrow">+</span>
+                        </div>
+                        <div class="param-group-content" id="freqDomainParams"></div>
+                    </div>
+                    <!-- 步态参数 -->
+                    <div class="param-group">
+                        <div class="param-group-header" onclick="app.toggleParamGroup(this)">
+                            <span class="param-group-title">步态参数</span>
+                            <span class="param-group-arrow">+</span>
+                        </div>
+                        <div class="param-group-content" id="gaitParams"></div>
+                    </div>
+                    <!-- 非线性参数 -->
+                    <div class="param-group">
+                        <div class="param-group-header" onclick="app.toggleParamGroup(this)">
+                            <span class="param-group-title">非线性参数</span>
+                            <span class="param-group-arrow">+</span>
+                        </div>
+                        <div class="param-group-content" id="nonlinearParams"></div>
+                    </div>
+                    <!-- 分段参数 -->
+                    <div class="param-group">
+                        <div class="param-group-header" onclick="app.toggleParamGroup(this)">
+                            <span class="param-group-title">分段参数</span>
+                            <span class="param-group-arrow">+</span>
+                        </div>
+                        <div class="param-group-content" id="segmentParams"></div>
+                    </div>
+                    <!-- 质控参数 -->
+                    <div class="param-group">
+                        <div class="param-group-header" onclick="app.toggleParamGroup(this)">
+                            <span class="param-group-title">质控参数</span>
+                            <span class="param-group-arrow">+</span>
+                        </div>
+                        <div class="param-group-content" id="qcParams"></div>
+                    </div>
                 </div>
-                <div class="result-item">
-                    <span class="result-label">平均步周期</span>
-                    <span class="result-value" id="cycleResult">-</span>
-                    <span class="result-unit">ms</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">步态周期变异</span>
-                    <span class="result-value" id="cvResult">-</span>
-                    <span class="result-unit">%</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">侧向摆动</span>
-                    <span class="result-value" id="swayResult">-</span>
-                    <span class="result-unit">rad/s</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">加速度标准差</span>
-                    <span class="result-value" id="accelStdResult">-</span>
-                    <span class="result-unit">m/s²</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">陀螺仪整体RMS</span>
-                    <span class="result-value" id="gyroRmsResult">-</span>
-                    <span class="result-unit">rad/s</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">综合平衡评分</span>
-                    <span class="result-value" id="stabilityResult">-</span>
-                    <span class="result-unit">/100</span>
-                </div>
-                <div class="manual-correction-hint">
-                    如果步数不准，点击✏️手动输入正确步数
+
+                <!-- 导出按钮组 -->
+                <div class="export-group">
+                    <button class="btn-export" onclick="app.exportCSV()">导出CSV</button>
+                    <button class="btn-export" onclick="app.exportJSON()">导出原始数据</button>
                 </div>
             </div>
 
+            <!-- 历史记录区 -->
+            <div class="history-card" id="historyCard" style="display: none;">
+                <h3>历史记录</h3>
+                <div class="history-list" id="historyList"></div>
+                <button class="btn-clear-history" onclick="app.clearHistory()">清除记录</button>
+            </div>
+
+            <!-- 测试说明卡片 -->
             <div class="info-card">
                 <h3>测试说明</h3>
                 <ul>
-                    <li>测试时间为10秒</li>
-                    <li><strong>足跟紧贴足尖，沿直线缓慢行走</strong></li>
-                    <li><strong>方式：手握手机</strong></li>
-                    <li><strong>尽可能保持手机平稳，避免主动摆臂</strong></li>
-                    <li>这样可以消除个人摆臂习惯差异，只测平衡调整带来的额外晃动</li>
-                    <li>保持身体平衡，尽可能走直</li>
+                    <li><strong>右手握持手机，屏幕朝向自己</strong></li>
+                    <li><strong>足跟贴足尖，沿直线缓慢行走</strong></li>
+                    <li><strong>保持手机平稳，避免主动摆臂</strong></li>
                     <li>需要至少5米直线空间</li>
+                    <li>测试时间：准备3秒 + 测试10秒</li>
                     <li>测试完成后自动分析结果</li>
                 </ul>
                 <div class="highlight-note">
-                    <strong>临床原理：</strong>颈脊髓病患者平衡受损，行走时会不自觉地频繁调整姿势<br>
-                    这些调整会导致握持的手机产生额外晃动，通过传感器定量检测<br>
-                    平衡越差，手机晃动幅度越大，综合评分越低<br>
-                    <small>注：本测试为筛查工具，结果仅供临床参考</small>
+                    <strong>临床原理：</strong>颈脊髓病压迫脊髓后索，导致本体感觉障碍，平衡功能受损。
+                    踵趾步态放大平衡异常，手握手机保持稳定时，平衡受损者会产生额外晃动，
+                    通过传感器定量检测晃动幅度来评估平衡功能。
+                </div>
+                <div class="ethics-notice">
+                    <strong>医学伦理声明</strong>
+                    <p>本工具仅供研究使用，不作为临床诊断依据。如有健康问题，请咨询专业医师。</p>
                 </div>
             </div>
         </main>
 
         <footer>
-            <p>OPLL步态分析研究项目</p>
+            <p>GaitOmics 步态组学研究项目</p>
         </footer>
     </div>
 
     <script src="sensor.js"></script>
     <script src="gait-analysis.js"></script>
+    <script src="data-export.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
