@@ -9,8 +9,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>十秒踵趾步态试验</h1>
-            <p>足跟贴足尖直线行走，用于评估颈椎病下肢功能</p>
+            <h1>十秒踵趾步态平衡测试</h1>
+            <p>手握手机行走，检测平衡稳定性评估颈椎病</p>
         </header>
 
         <main>
@@ -25,7 +25,7 @@
             </div>
 
             <div class="results-card" id="resultsCard" style="display: none;">
-                <h2>测试结果</h2>
+                <h2>平衡测试结果</h2>
                 <div class="result-item result-item-editable">
                     <span class="result-label">总步数 <button class="btn-edit" onclick="editSteps()">✏️</button></span>
                     <span class="result-value" id="stepsResult">-</span>
@@ -52,12 +52,17 @@
                     <span class="result-unit">rad/s</span>
                 </div>
                 <div class="result-item">
-                    <span class="result-label">加速度RMS</span>
-                    <span class="result-value" id="rmsResult">-</span>
+                    <span class="result-label">加速度标准差</span>
+                    <span class="result-value" id="accelStdResult">-</span>
                     <span class="result-unit">m/s²</span>
                 </div>
                 <div class="result-item">
-                    <span class="result-label">步态稳定性</span>
+                    <span class="result-label">陀螺仪整体RMS</span>
+                    <span class="result-value" id="gyroRmsResult">-</span>
+                    <span class="result-unit">rad/s</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">综合平衡评分</span>
                     <span class="result-value" id="stabilityResult">-</span>
                     <span class="result-unit">/100</span>
                 </div>
@@ -70,16 +75,17 @@
                 <h3>测试说明</h3>
                 <ul>
                     <li>测试时间为10秒</li>
-                    <li><strong>足跟紧贴足尖，沿直线行走</strong></li>
+                    <li><strong>足跟紧贴足尖，沿直线缓慢行走</strong></li>
+                    <li><strong>方式：自然手握手机</strong></li>
+                    <li>行走过程中正常摆臂，手机随手部自然摆动</li>
                     <li>保持身体平衡，尽可能走直</li>
-                    <li><strong>手机放置：推荐固定在腰部口袋，或紧身裤前口袋</strong></li>
-                    <li>保持手机与身体相对固定，不同放置位置会影响结果</li>
                     <li>需要至少5米直线空间</li>
                     <li>测试完成后自动分析结果</li>
                 </ul>
                 <div class="highlight-note">
-                    <strong>临床意义：</strong>踵趾步态对颈脊髓病平衡障碍检测敏感性更高<br>
-                    <small>注：本测试为筛查工具，结果仅供临床参考。手机传感器受放置位置影响，计数可能存在误差</small>
+                    <strong>临床原理：</strong>颈脊髓病患者平衡受损，会不自觉地通过手臂晃动来维持平衡<br>
+                    本测试直接检测手机（手部）的晃动幅度，评估平衡功能<br>
+                    <small>注：本测试为筛查工具，结果仅供临床参考</small>
                 </div>
             </div>
         </main>

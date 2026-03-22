@@ -194,25 +194,47 @@ class GaitAnalyzer {
             const squaredSum = values.reduce((a, b) => a + (b - mean)**2, 0);
             accelRMS = Math.sqrt(squaredSum / values.length);
         }
+
+        // 加速度整体标准差
+        let accelStd = 0;
+        if (filteredAccel.length > 10) {
+            const values = filteredAccel.map(d => d.filtered);
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const squaredSum = values.reduce((a, b) => a + (b - mean)**2, 0);
+            accelStd = Math.sqrt(squaredSum / values.length);
+        }
         
-        // 计算侧向摆动幅度（针对踵趾步态，陀螺仪数据检测左右平衡）
+        // 计算侧向摆动幅度 + 整体陀螺仪RMS（针对手握手机方案）
+        // 平衡差的病人需要不断用手调整平衡，整体晃动更大
         let lateralSway = 0;
+        let gyroRMS = 0;
         if (processedData.gyro && processedData.gyro.length > 0) {
-            // 绕垂直轴（z轴）的角速度标准差反映左右摆动
+            // 1. 侧向摆动：绕垂直轴（z轴）的角速度标准差反映左右摆动
             const zValues = processedData.gyro.map(d => Math.abs(d.z));
             const zMean = zValues.reduce((a, b) => a + b, 0) / zValues.length;
             const zVar = zValues.reduce((a, b) => a + (b - zMean)**2, 0) / zValues.length;
             lateralSway = Math.sqrt(zVar); // 标准差，单位：rad/s
+            
+            // 2. 陀螺仪整体RMS：反映手部整体晃动程度
+            // 平衡受损病人，手会不自觉晃动来帮助维持平衡，整体RMS更大
+            const allGyroValues = processedData.gyro.map(d => d.magnitude);
+            const gyroMean = allGyroValues.reduce((a, b) => a + b, 0) / allGyroValues.length;
+            const gyroSquaredSum = allGyroValues.reduce((a, b) => a + (b - gyroMean)**2, 0);
+            gyroRMS = Math.sqrt(gyroSquaredSum / allGyroValues.length);
         }
         
         // 综合稳定性评分 (0-100)，越高越稳定
-        // 踵趾步态：减少侧向摆动惩罚，避免误判
+        // 新方案：手握手机检测平衡，所以整体晃动参数权重更大
+        // 平衡越差 → 手部晃动越大 → 评分越低
         let stabilityScore = 100;
         if (cycleVariability > 0) {
-            // 变异系数越小越稳定，侧向摆动越大越不稳定
-            // 原来惩罚太重了(lateralSway * 15)，减小到8
-            stabilityScore = Math.max(0, 100 - cycleVariability * 1.2 - 
-                                     amplitudeVariability * 0.3 - (lateralSway * 8));
+            stabilityScore = Math.max(0, 100 
+                - cycleVariability * 1.0          // 步态周期变异
+                - amplitudeVariability * 0.3     // 步幅变异
+                - lateralSway * 5               // 侧向摆动
+                - gyroRMS * 8                   // 整体陀螺仪晃动，这个最关键！平衡差的更大
+                - accelStd * 3                 // 整体加速度标准差
+            );
         }
         
         // 估计步速 (基于临床数据，正常人踵趾步态步频约60-90步/分钟)
@@ -227,6 +249,8 @@ class GaitAnalyzer {
             amplitudeVariability: parseFloat(amplitudeVariability.toFixed(1)),
             lateralSway: parseFloat(lateralSway.toFixed(2)),
             accelRMS: parseFloat(accelRMS.toFixed(2)),
+            accelStd: parseFloat(accelStd.toFixed(2)),
+            gyroRMS: parseFloat(gyroRMS.toFixed(2)),
             stabilityScore: parseFloat(stabilityScore.toFixed(1)),
             estimatedSpeed: parseFloat(estimatedSpeed.toFixed(2))
         };

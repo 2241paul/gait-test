@@ -20,7 +20,8 @@ const cadenceResult = document.getElementById('cadenceResult');
 const cycleResult = document.getElementById('cycleResult');
 const cvResult = document.getElementById('cvResult');
 const swayResult = document.getElementById('swayResult');
-const rmsResult = document.getElementById('rmsResult');
+const accelStdResult = document.getElementById('accelStdResult');
+const gyroRmsResult = document.getElementById('gyroRmsResult');
 const stabilityResult = document.getElementById('stabilityResult');
 
 // 当前结果缓存，用于手动编辑
@@ -178,7 +179,8 @@ function displayResults(result) {
     cycleResult.textContent = params.avgCycleTime;
     cvResult.textContent = params.cycleVariability;
     swayResult.textContent = params.lateralSway;
-    rmsResult.textContent = params.accelRMS;
+    accelStdResult.textContent = params.accelStd;
+    gyroRmsResult.textContent = params.gyroRMS;
     stabilityResult.textContent = params.stabilityScore;
 }
 
