@@ -250,7 +250,7 @@ class GaitAnalyzer {
             lateralSway: parseFloat(lateralSway.toFixed(2)),
             accelRMS: parseFloat(accelRMS.toFixed(2)),
             accelStd: parseFloat(accelStd.toFixed(2)),
-            gyroRMS: parseFloat(gyroRMS.toFixed(2)),
+            gyroRms: parseFloat(gyroRMS.toFixed(2)),
             stabilityScore: parseFloat(stabilityScore.toFixed(1)),
             estimatedSpeed: parseFloat(estimatedSpeed.toFixed(2))
         };
