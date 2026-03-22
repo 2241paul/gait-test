@@ -21,9 +21,21 @@ class GaitAnalyzer {
             };
         });
 
+        // 处理陀螺仪数据，计算合角速度
+        const processedGyro = gyroData.map(d => {
+            const magnitude = Math.sqrt(d.x**2 + d.y**2 + d.z**2);
+            return {
+                timestamp: d.timestamp,
+                x: d.x,
+                y: d.y,
+                z: d.z,
+                magnitude: magnitude
+            };
+        });
+
         return {
             accel: processedAccel,
-            gyro: gyroData,
+            gyro: processedGyro,
             startTime: Math.min(...rawData.map(d => d.timestamp)),
             endTime: Math.max(...rawData.map(d => d.timestamp)),
             duration: (Math.max(...rawData.map(d => d.timestamp)) - Math.min(...rawData.map(d => d.timestamp))) / 1000
@@ -52,38 +64,81 @@ class GaitAnalyzer {
         return filtered;
     }
 
-    // 检测步态周期（峰值检测找迈步）
-    // 针对踵趾步态调整：步幅小，降低阈值，增大最小间隔，减少误检
-    detectSteps(filteredAccel) {
-        const steps = [];
-        const windowSize = Math.floor(this.sampleRate * 0.5); // 0.5秒窗口
+    // 检测步态周期 - 融合加速度+陀螺仪双峰值检测
+    // 踵趾步态步幅小，融合多传感器提高检测准确性
+    detectSteps(processedData) {
+        const filteredAccel = this.lowPassFilter(processedData.accel);
+        const filteredGyro = this.lowPassFilterGyro(processedData.gyro);
         
-        // 计算标准差作为阈值
-        const values = filteredAccel.map(d => d.filtered);
-        const mean = values.reduce((a, b) => a + b, 0) / values.length;
-        const variance = values.reduce((a, b) => a + (b - mean)**2, 0) / values.length;
-        const std = Math.sqrt(variance);
-        const threshold = mean + 0.3 * std; // 降低阈值，踵趾步态迈步幅度小
+        const steps = [];
+        // 踵趾步态步频低，放宽最小间隔到500ms
+        const minInterval = 500; 
+        
+        // 加速度计算阈值
+        const accelValues = filteredAccel.map(d => d.filtered);
+        const accelMean = accelValues.reduce((a, b) => a + b, 0) / accelValues.length;
+        const accelVariance = accelValues.reduce((a, b) => a + (b - accelMean)**2, 0) / accelValues.length;
+        const accelStd = Math.sqrt(accelVariance);
+        const accelThreshold = accelMean + 0.25 * accelStd; // 进一步降低阈值
 
-        for (let i = 1; i < filteredAccel.length - 1; i++) {
-            // 寻找局部峰值
-            if (filteredAccel[i].filtered > threshold &&
-                filteredAccel[i].filtered > filteredAccel[i-1].filtered &&
-                filteredAccel[i].filtered > filteredAccel[i+1].filtered) {
-                
-                // 检查与上一步的时间间隔（最小步间隔增大到400ms，踵趾步态慢，减少重复检测）
-                // 正常人踵趾步态步频约30-60步/分钟，步间隔大约1000-2000ms
+        // 陀螺仪计算阈值（绕前后轴摆动，迈步时会有峰值）
+        let gyroThreshold = 0.5;
+        if (filteredGyro.length > 10) {
+            const gyroValues = filteredGyro.map(d => d.filtered);
+            const gyroMean = gyroValues.reduce((a, b) => a + b, 0) / gyroValues.length;
+            const gyroVariance = gyroValues.reduce((a, b) => a + (b - gyroMean)**2, 0) / gyroValues.length;
+            const gyroStd = Math.sqrt(gyroVariance);
+            gyroThreshold = gyroMean + 0.5 * gyroStd;
+        }
+
+        // 融合检测：任一传感器检测到峰值即为一步
+        for (let i = 2; i < filteredAccel.length - 2; i++) {
+            const accelPeak = filteredAccel[i].filtered > accelThreshold &&
+                             filteredAccel[i].filtered > filteredAccel[i-1].filtered &&
+                             filteredAccel[i].filtered > filteredAccel[i+1].filtered;
+            
+            const gyroPeak = filteredGyro.length > i && 
+                            filteredGyro[i].filtered > gyroThreshold &&
+                            filteredGyro[i].filtered > filteredGyro[i-1].filtered &&
+                            filteredGyro[i].filtered > filteredGyro[i+1].filtered;
+            
+            // 至少一个传感器检测到峰值就算一步
+            if (accelPeak || gyroPeak) {
+                // 检查时间间隔
                 if (steps.length === 0 || 
-                    (filteredAccel[i].timestamp - steps[steps.length - 1].timestamp) > 400) {
+                    (filteredAccel[i].timestamp - steps[steps.length - 1].timestamp) > minInterval) {
                     steps.push({
                         timestamp: filteredAccel[i].timestamp,
-                        amplitude: filteredAccel[i].filtered - mean
+                        amplitude: filteredAccel[i].filtered - accelMean,
+                        hasGyroPeak: gyroPeak
                     });
                 }
             }
         }
 
-        return steps;
+        return {steps: steps, filteredAccel: filteredAccel};
+    }
+    
+    // 陀螺仪低通滤波
+    lowPassFilterGyro(data, alpha = 0.25) {
+        if (data.length === 0) return [];
+        
+        const filtered = [];
+        let prevFiltered = data[0].magnitude;
+        filtered.push({
+            ...data[0],
+            filtered: prevFiltered
+        });
+
+        for (let i = 1; i < data.length; i++) {
+            prevFiltered = alpha * data[i].magnitude + (1 - alpha) * prevFiltered;
+            filtered.push({
+                ...data[i],
+                filtered: prevFiltered
+            });
+        }
+
+        return filtered;
     }
 
     // 计算步态参数，包括侧向摆动分析（针对踵趾步态优化）
@@ -243,19 +298,18 @@ class GaitAnalyzer {
         // 1. 预处理
         const processed = this.preprocessData(rawData);
         
-        // 2. 滤波
-        const filtered = this.lowPassFilter(processed.accel);
+        // 2. 融合步检测（加速度+陀螺仪）
+        const detectResult = this.detectSteps(processed);
+        const steps = detectResult.steps;
+        const filteredAccel = detectResult.filteredAccel;
         
-        // 3. 步检测
-        const steps = this.detectSteps(filtered);
+        // 3. 计算参数
+        const params = this.calculateGaitParams(steps, processed, filteredAccel);
         
-        // 4. 计算参数
-        const params = this.calculateGaitParams(steps, processed, filtered);
-        
-        // 5. 预测mJOA评分
+        // 4. 预测mJOA评分
         const mjPrediction = this.predictMJOA(params);
         
-        // 6. 整体等级
+        // 5. 整体等级
         const grade = this.getGrade(params.stabilityScore, params.cadence);
         
         return {
