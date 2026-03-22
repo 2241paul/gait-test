@@ -86,7 +86,11 @@ function finishTest() {
     }
     
     // 播放提示音
-    playBeep();
+    try {
+        playBeep();
+    } catch (e) {
+        // 忽略错误
+    }
     
     // 获取数据并分析
     const rawData = sensorManager.getData();
@@ -97,18 +101,29 @@ function finishTest() {
         return;
     }
     
-    // 分析数据
-    const result = gaitAnalyzer.analyze(rawData);
+    try {
+        // 分析数据
+        const result = gaitAnalyzer.analyze(rawData);
+        
+        // 显示结果
+        displayResults(result);
+    } catch (e) {
+        console.error('分析出错', e);
+        alert('分析出错：' + e.message);
+    }
     
-    // 显示结果
-    displayResults(result);
-    
-    // 更新UI
-    isTesting = false;
-    timerDisplay.classList.remove('timer-counting');
-    statusText.textContent = '测试完成';
-    resetBtn.style.display = 'inline-block';
-    resultsCard.style.display = 'block';
+    // 无论如何都要显示结果卡片
+    try {
+        // 更新UI
+        isTesting = false;
+        timerDisplay.classList.remove('timer-counting');
+        statusText.textContent = '测试完成';
+        resetBtn.style.display = 'inline-block';
+        resultsCard.style.display = 'block';
+    } catch (e) {
+        console.error('UI更新出错', e);
+        alert('UI更新出错，请刷新页面重试');
+    }
 }
 
 // 播放结束提示音
