@@ -15,10 +15,12 @@ const resetBtn = document.getElementById('resetBtn');
 const resultsCard = document.getElementById('resultsCard');
 
 // 结果显示元素
+const stepsResult = document.getElementById('stepsResult');
 const cadenceResult = document.getElementById('cadenceResult');
+const cycleResult = document.getElementById('cycleResult');
+const cvResult = document.getElementById('cvResult');
 const swayResult = document.getElementById('swayResult');
 const stabilityResult = document.getElementById('stabilityResult');
-const stepsResult = document.getElementById('stepsResult');
 const mjoaResult = document.getElementById('mjoaResult');
 const gradeResult = document.getElementById('gradeResult');
 
@@ -104,10 +106,12 @@ function displayResults(result) {
     const params = result.params;
     const mjPred = result.mjPrediction;
     
+    stepsResult.textContent = params.stepCount;
     cadenceResult.textContent = params.cadence;
+    cycleResult.textContent = params.avgCycleTime;
+    cvResult.textContent = params.cycleVariability;
     swayResult.textContent = params.lateralSway;
     stabilityResult.textContent = params.stabilityScore;
-    stepsResult.textContent = params.stepCount;
     mjoaResult.textContent = `${mjPred.score} (${mjPred.description})`;
     
     gradeResult.textContent = result.grade.text;

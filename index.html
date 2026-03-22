@@ -27,9 +27,24 @@
             <div class="results-card" id="resultsCard" style="display: none;">
                 <h2>测试结果</h2>
                 <div class="result-item">
+                    <span class="result-label">总步数</span>
+                    <span class="result-value" id="stepsResult">-</span>
+                    <span class="result-unit">步 / 10秒</span>
+                </div>
+                <div class="result-item">
                     <span class="result-label">步频</span>
                     <span class="result-value" id="cadenceResult">-</span>
                     <span class="result-unit">步/分钟</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">平均步周期</span>
+                    <span class="result-value" id="cycleResult">-</span>
+                    <span class="result-unit">ms</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">步态周期变异</span>
+                    <span class="result-value" id="cvResult">-</span>
+                    <span class="result-unit">%</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">侧向摆动</span>
@@ -40,11 +55,6 @@
                     <span class="result-label">步态稳定性</span>
                     <span class="result-value" id="stabilityResult">-</span>
                     <span class="result-unit">/100</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">总步数</span>
-                    <span class="result-value" id="stepsResult">-</span>
-                    <span class="result-unit">步</span>
                 </div>
                 <div class="result-item mjora-result">
                     <span class="result-label">预测mJOA下肢评分</span>
@@ -64,12 +74,14 @@
                     <li>测试时间为10秒</li>
                     <li><strong>足跟紧贴足尖，沿直线行走</strong></li>
                     <li>保持身体平衡，尽可能走直</li>
-                    <li>手机请固定在口袋或腰部</li>
+                    <li><strong>手机放置：推荐固定在腰部口袋，或紧身裤前口袋</strong></li>
+                    <li>保持手机与身体相对固定，不同放置位置会影响结果</li>
                     <li>需要至少5米直线空间</li>
                     <li>测试完成后自动分析结果</li>
                 </ul>
                 <div class="highlight-note">
-                    <strong>临床意义：</strong>踵趾步态对颈脊髓病平衡障碍检测敏感性更高
+                    <strong>临床意义：</strong>踵趾步态对颈脊髓病平衡障碍检测敏感性更高<br>
+                    <small>注：本测试为筛查工具，结果仅供临床参考
                 </div>
             </div>
         </main>

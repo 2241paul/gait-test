@@ -163,36 +163,44 @@ class GaitAnalyzer {
     // 根据步态参数预测mJOA下肢评分
     // mJOA下肢评分范围：0-4分
     // 0=不能行走，1=需要帮助行走，2=需要助行器，3=不稳但可独行，4=正常
-    // 针对踵趾步态优化阈值
+    // 针对踵趾步态优化阈值 - 踵趾步态本身速度就慢，不能用正常行走标准判断
     predictMJOA(params) {
         // 基于文献和临床数据的预测模型
-        // 关键预测因子：步频、稳定性、步数、侧向摆动
+        // 关键预测因子：稳定性、侧向摆动、步态变异，次要：步频/步数
+        // 参考：Nakashima 2021, Choy 2022
         
         let prediction = 4; // 起始：正常
         
-        // 步频评估（正常人踵趾步态约60-80步/分）
-        if (params.cadence < 60) {
+        // 稳定性评估（主要因素：包含侧向摆动和周期变异惩罚）
+        // 稳定性评分低才代表异常，步频慢本身不一定异常
+        if (params.stabilityScore < 40) {
             prediction -= 1;
         }
-        if (params.cadence < 40) {
-            prediction -= 1;
-        }
-        
-        // 稳定性评估（包含侧向摆动惩罚）
-        if (params.stabilityScore < 45) {
-            prediction -= 1;
-        }
-        if (params.stabilityScore < 25) {
+        if (params.stabilityScore < 20) {
             prediction -= 1;
         }
         
-        // 10秒内步数评估（正常人踵趾行走约10-13步）
-        if (params.stepCount < 6) {
+        // 侧向摆动评估（DCM患者平衡受损，侧向摆动显著增大）
+        if (params.lateralSway > 2.0) {
+            prediction -= 1;
+        }
+        if (params.lateralSway > 3.0) {
             prediction -= 1;
         }
         
-        // 额外侧向摆动评估
-        if (params.lateralSway > 1.5) {
+        // 步态周期变异（变异越大越不稳定）
+        if (params.cycleVariability > 20) {
+            prediction -= 0.5;
+        }
+        
+        // 10秒内步数评估（正常人缓慢踵趾行走也能完成6步以上）
+        // 只有严重受损才会少于6步
+        if (params.stepCount < 4) {
+            prediction -= 1;
+        }
+        
+        // 步频评估（放宽标准，踵趾步态本来就慢，40步以上都可接受）
+        if (params.cadence < 25) {
             prediction -= 0.5;
         }
         
@@ -201,9 +209,9 @@ class GaitAnalyzer {
         prediction = Math.round(prediction);
         
         // 置信度估算
-        let confidence = 75; // 踵趾步态本身敏感性更高，提高基础置信度
+        let confidence = 70;
         if (params.stepCount > 5) confidence += 10;
-        if (params.stepCount > 8) confidence += 10;
+        if (params.cycleVariability > 0) confidence += 5; // 有变异数据增加置信度
         
         const gradeDescriptions = {
             0: "严重受损",
@@ -221,9 +229,10 @@ class GaitAnalyzer {
     }
 
     // 获取评估等级，针对踵趾步态调整阈值
+    // 踵趾步态本身速度慢，主要看稳定性，不要过度判异常
     getGrade(stabilityScore, cadence) {
-        if (stabilityScore >= 60 && cadence >= 50) return { text: "良好", className: "grade-excellent" };
-        if (stabilityScore >= 35 && cadence >= 35) return { text: "尚可", className: "grade-good" };
+        if (stabilityScore >= 50) return { text: "良好", className: "grade-excellent" };
+        if (stabilityScore >= 25) return { text: "尚可", className: "grade-good" };
         return { text: "异常", className: "grade-poor" };
     }
 
