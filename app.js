@@ -78,7 +78,7 @@ function finishTest() {
     // 停止传感器
     sensorManager.stopSensors();
     
-    // 震动提醒测试结束（如果支持）
+    // 震动+声音提醒测试结束，iOS需要用户交互才能播放声音
     if ('vibrate' in navigator) {
         try {
             navigator.vibrate([200, 100, 200]);
@@ -86,6 +86,9 @@ function finishTest() {
             // 不支持震动忽略即可
         }
     }
+    
+    // 播放提示音
+    playBeep();
     
     // 获取数据并分析
     const rawData = sensorManager.getData();
@@ -108,6 +111,28 @@ function finishTest() {
     statusText.textContent = '测试完成';
     resetBtn.style.display = 'inline-block';
     resultsCard.style.display = 'block';
+}
+
+// 播放结束提示音
+function playBeep() {
+    try {
+        // 使用AudioContext创建简单的蜂鸣声
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+            const ctx = new AudioContext();
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            oscillator.frequency.value = 800;
+            gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            oscillator.start(ctx.currentTime);
+            oscillator.stop(ctx.currentTime + 0.3);
+        }
+    } catch (e) {
+        // 不支持声音忽略
+    }
 }
 
 // 显示结果

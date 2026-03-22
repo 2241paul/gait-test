@@ -193,12 +193,13 @@ class GaitAnalyzer {
         }
         
         // 综合稳定性评分 (0-100)，越高越稳定
-        // 踵趾步态：增加侧向摆动惩罚，DCM患者侧向摆动增大
+        // 踵趾步态：减少侧向摆动惩罚，避免误判
         let stabilityScore = 100;
         if (cycleVariability > 0) {
             // 变异系数越小越稳定，侧向摆动越大越不稳定
+            // 原来惩罚太重了(lateralSway * 15)，减小到8
             stabilityScore = Math.max(0, 100 - cycleVariability * 1.2 - 
-                                     amplitudeVariability * 0.3 - (lateralSway * 15));
+                                     amplitudeVariability * 0.3 - (lateralSway * 8));
         }
         
         // 估计步速 (基于临床数据，正常人踵趾步态步频约60-90步/分钟)
@@ -223,42 +224,50 @@ class GaitAnalyzer {
     // 针对踵趾步态优化阈值 - 踵趾步态本身速度就慢，不能用正常行走标准判断
     predictMJOA(params) {
         // 基于文献和临床数据的预测模型
-        // 关键预测因子：稳定性、侧向摆动、步态变异，次要：步频/步数
+        // 关键预测因子：稳定性、侧向摆动、步态变异
+        // 步数多/步频高说明功能好，应该加分不是扣分
         // 参考：Nakashima 2021, Choy 2022
         
         let prediction = 4; // 起始：正常
         
         // 稳定性评估（主要因素：包含侧向摆动和周期变异惩罚）
         // 稳定性评分低才代表异常，步频慢本身不一定异常
-        if (params.stabilityScore < 40) {
+        if (params.stabilityScore < 30) {
             prediction -= 1;
         }
-        if (params.stabilityScore < 20) {
+        if (params.stabilityScore < 15) {
             prediction -= 1;
         }
         
         // 侧向摆动评估（DCM患者平衡受损，侧向摆动显著增大）
-        if (params.lateralSway > 2.0) {
+        // 放宽阈值，减少过度扣分
+        if (params.lateralSway > 3.0) {
             prediction -= 1;
         }
-        if (params.lateralSway > 3.0) {
+        if (params.lateralSway > 4.5) {
             prediction -= 1;
         }
         
         // 步态周期变异（变异越大越不稳定）
-        if (params.cycleVariability > 20) {
+        if (params.cycleVariability > 25) {
             prediction -= 0.5;
         }
         
-        // 10秒内步数评估（正常人缓慢踵趾行走也能完成6步以上）
-        // 只有严重受损才会少于6步
-        if (params.stepCount < 4) {
-            prediction -= 1;
+        // 10秒内步数评估（修正逻辑：步数少才扣分，多不扣分）
+        // 正常人踵趾行走：慢速约6-8步，快速10-15步，12步完全正常
+        if (params.stepCount < 3) {
+            prediction -= 1; // 只有极少步数才扣分
         }
         
-        // 步频评估（放宽标准，踵趾步态本来就慢，40步以上都可接受）
-        if (params.cadence < 25) {
+        // 步频评估（进一步放宽，30步以上都正常）
+        // 你12步10秒就是72步/分钟，完全正常，不扣分
+        if (params.cadence < 20) {
             prediction -= 0.5;
+        }
+        
+        // 步数多说明功能好，轻微加分（修正原来逻辑错误）
+        if (params.stepCount >= 10) {
+            prediction += 0.5; // 10秒10步以上说明功能很好
         }
         
         // 限制范围
