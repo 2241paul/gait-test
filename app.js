@@ -78,6 +78,15 @@ function finishTest() {
     // 停止传感器
     sensorManager.stopSensors();
     
+    // 震动提醒测试结束（如果支持）
+    if ('vibrate' in navigator) {
+        try {
+            navigator.vibrate([200, 100, 200]);
+        } catch (e) {
+            // 不支持震动忽略即可
+        }
+    }
+    
     // 获取数据并分析
     const rawData = sensorManager.getData();
     

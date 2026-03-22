@@ -53,6 +53,7 @@ class GaitAnalyzer {
     }
 
     // 检测步态周期（峰值检测找迈步）
+    // 针对踵趾步态调整：步幅小，降低阈值，增大最小间隔，减少误检
     detectSteps(filteredAccel) {
         const steps = [];
         const windowSize = Math.floor(this.sampleRate * 0.5); // 0.5秒窗口
@@ -62,7 +63,7 @@ class GaitAnalyzer {
         const mean = values.reduce((a, b) => a + b, 0) / values.length;
         const variance = values.reduce((a, b) => a + (b - mean)**2, 0) / values.length;
         const std = Math.sqrt(variance);
-        const threshold = mean + 0.5 * std; // 阈值设为均值加半个标准差
+        const threshold = mean + 0.3 * std; // 降低阈值，踵趾步态迈步幅度小
 
         for (let i = 1; i < filteredAccel.length - 1; i++) {
             // 寻找局部峰值
@@ -70,9 +71,10 @@ class GaitAnalyzer {
                 filteredAccel[i].filtered > filteredAccel[i-1].filtered &&
                 filteredAccel[i].filtered > filteredAccel[i+1].filtered) {
                 
-                // 检查与上一步的时间间隔（最小步间隔0.3秒≈200步/分钟）
+                // 检查与上一步的时间间隔（最小步间隔增大到400ms，踵趾步态慢，减少重复检测）
+                // 正常人踵趾步态步频约30-60步/分钟，步间隔大约1000-2000ms
                 if (steps.length === 0 || 
-                    (filteredAccel[i].timestamp - steps[steps.length - 1].timestamp) > 300) {
+                    (filteredAccel[i].timestamp - steps[steps.length - 1].timestamp) > 400) {
                     steps.push({
                         timestamp: filteredAccel[i].timestamp,
                         amplitude: filteredAccel[i].filtered - mean
