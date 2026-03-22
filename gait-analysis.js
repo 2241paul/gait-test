@@ -71,27 +71,28 @@ class GaitAnalyzer {
         const filteredGyro = this.lowPassFilterGyro(processedData.gyro);
         
         const steps = [];
-        // 踵趾步态步频低，放宽最小间隔到500ms
-        const minInterval = 500; 
+        // 踵趾步态步频低，最小间隔450ms - 500ms太严格容易合并临近迈步
+        // 正常人10秒10-12步，平均间隔800-1000ms，所以450足够防重复
+        const minInterval = 450; 
         
         // 加速度计算阈值
         const accelValues = filteredAccel.map(d => d.filtered);
         const accelMean = accelValues.reduce((a, b) => a + b, 0) / accelValues.length;
         const accelVariance = accelValues.reduce((a, b) => a + (b - accelMean)**2, 0) / accelValues.length;
         const accelStd = Math.sqrt(accelVariance);
-        // 提高阈值，减少静止时噪声误检
-        // 原来0.25std，现在0.4std，静止噪声不会触发
-        const accelThreshold = accelMean + 0.4 * accelStd;
+        // 折中阈值：0.3std 兼顾不误检静止也不漏检小迈步
+        // 0.4太严可能漏步，0.2太松误检，取中间值
+        const accelThreshold = accelMean + 0.3 * accelStd;
 
         // 陀螺仪计算阈值（绕前后轴摆动，迈步时会有峰值）
-        let gyroThreshold = 0.8;
+        let gyroThreshold = 0.6;
         if (filteredGyro.length > 10) {
             const gyroValues = filteredGyro.map(d => d.filtered);
             const gyroMean = gyroValues.reduce((a, b) => a + b, 0) / gyroValues.length;
             const gyroVariance = gyroValues.reduce((a, b) => a + (b - gyroMean)**2, 0) / gyroValues.length;
             const gyroStd = Math.sqrt(gyroVariance);
-            // 提高阈值，减少噪声误检
-            gyroThreshold = gyroMean + 0.8 * gyroStd;
+            // 折中：0.6std，兼顾不漏检和不误检
+            gyroThreshold = gyroMean + 0.6 * gyroStd;
         }
 
         // 融合检测：任一传感器检测到峰值即为一步
