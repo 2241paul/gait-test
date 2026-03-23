@@ -100,43 +100,76 @@ class GaitAnalyzer {
         const accel = processed.accel;
         if (accel.length < 20) return { steps: [], filtered: [] };
 
-        // 带通滤波 0.5-3Hz (Butterworth 2阶近似)
-        const vertical = accel.map(d => d.z); // Z轴=上下方向
-        const filtered = this._bandpassFilter(vertical, 0.5, 3.0, this.targetSampleRate);
+        /* -----------------------------------------------------------
+         * 踵趾步行步检测优化策略：
+         * 1. 使用矢量模信号，对任意握持方向鲁棒
+         * 2. 带通滤波锁定踵趾步行频率范围 0.5~2 Hz
+         * 3. 提高阈值到 mean + 0.6*std，减少噪声误触发
+         * 4. 最小步间隔 500ms（≤120步/分钟，踵趾步行实际50~80步/分钟）
+         * 5. 添加移动平均平滑，消除传感器抖动
+         * ----------------------------------------------------------- */
 
-        // 峰值检测
+        // 1. 取矢量模（方向无关）
+        const totalSignal = accel.map(d => d.total);
+
+        // 2. 移动均值平滑（窗口5点 = 50ms @100Hz），去除高频抖动
+        const smoothed = this._movingAverage(totalSignal, 5);
+
+        // 3. 带通滤波 0.5~2Hz
+        const filtered = this._bandpassFilter(smoothed, 0.5, 2.0, this.targetSampleRate);
+
+        // 4. 峰值检测
         const steps = [];
-        const minInterval = 300; // ms，最小步间隔
-        const windowSize = 5;
+        const minIntervalMs = 500;     // 最小步间隔 500ms
+        const windowSize   = 8;        // 峰值检测窗口（前后各8点 = 80ms）
 
-        // 自适应阈值
-        const mean = this._mean(filtered);
-        const std = this._std(filtered);
-        const threshold = mean + 0.25 * std;
+        const mean  = this._mean(filtered);
+        const std   = this._std(filtered);
+        // 阈值：mean + 0.6*std，低于此高度的峰忽略
+        const threshold = mean + 0.6 * std;
 
         for (let i = windowSize; i < filtered.length - windowSize; i++) {
+            // 判断局部峰
             let isPeak = true;
             for (let j = 1; j <= windowSize; j++) {
-                if (filtered[i] < filtered[i - j] || filtered[i] < filtered[i + j]) {
+                if (filtered[i] <= filtered[i - j] || filtered[i] <= filtered[i + j]) {
                     isPeak = false;
                     break;
                 }
             }
 
-            if (isPeak && filtered[i] > threshold) {
-                const ts = accel[i].timestamp;
-                if (steps.length === 0 || (ts - steps[steps.length - 1].timestamp) > minInterval) {
-                    steps.push({
-                        timestamp: ts,
-                        t: accel[i].t,
-                        amplitude: filtered[i] - mean,
-                        index: i
-                    });
-                }
+            if (!isPeak || filtered[i] <= threshold) continue;
+
+            const ts = accel[i].timestamp;
+            if (steps.length === 0 || (ts - steps[steps.length - 1].timestamp) >= minIntervalMs) {
+                steps.push({
+                    timestamp: ts,
+                    t: accel[i].t,
+                    amplitude: filtered[i] - mean,
+                    index: i
+                });
             }
         }
 
         return { steps, filtered };
+    }
+
+    /**
+     * 移动均值平滑
+     */
+    _movingAverage(signal, windowSize) {
+        if (signal.length === 0) return [];
+        const half   = Math.floor(windowSize / 2);
+        const result = new Array(signal.length);
+        for (let i = 0; i < signal.length; i++) {
+            let sum = 0, cnt = 0;
+            for (let j = Math.max(0, i - half); j <= Math.min(signal.length - 1, i + half); j++) {
+                sum += signal[j];
+                cnt++;
+            }
+            result[i] = sum / cnt;
+        }
+        return result;
     }
 
     // ====== A. 时域统计参数（~56个）======

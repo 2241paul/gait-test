@@ -234,13 +234,14 @@
         isTesting = true;
         remainingTime = 10;
 
-        // 更新UI
-        timerCircle.className = 'timer-circle testing';
-        timerDisplay.textContent = '10';
-        timerDisplay.classList.remove('timer-counting');
-        void timerDisplay.offsetWidth;
-        timerDisplay.classList.add('timer-counting');
-        statusText.textContent = '正在进行踵趾行走...';
+        // 更新UI（每次都重新获取DOM，避免null）
+        const timerCircle  = $('timerCircle');
+        const timerDisplay = $('timerDisplay');
+        const statusText   = $('statusText');
+
+        if (timerCircle)  timerCircle.className = 'timer-circle testing';
+        if (timerDisplay) { timerDisplay.textContent = '10'; timerDisplay.classList.remove('timer-counting'); void timerDisplay.offsetWidth; timerDisplay.classList.add('timer-counting'); }
+        if (statusText)   statusText.textContent = '正在进行踵趾行走...';
 
         // 语音提示
         speak('请开始踵趾行走，保持手机平稳');
@@ -259,10 +260,10 @@
         // 开始10秒倒计时
         countdownTimer = setInterval(() => {
             remainingTime--;
-            timerDisplay.textContent = remainingTime;
+            const td = $('timerDisplay');
+            if (td) td.textContent = remainingTime;
 
             if (remainingTime <= 3 && remainingTime > 0) {
-                // 最后3秒脉冲更明显
                 playBeep(600, 0.15);
             }
 
@@ -290,11 +291,16 @@
         // 停止波形
         stopWaveform();
 
-        // 完成效果
-        timerCircle.className = 'timer-circle completed';
-        timerDisplay.textContent = '\u2713'; // ✓
-        timerDisplay.classList.remove('timer-counting');
-        statusText.textContent = '测试完成';
+        // 完成效果（重新获取DOM）
+        const timerCircle  = $('timerCircle');
+        const timerDisplay = $('timerDisplay');
+        const statusText   = $('statusText');
+        const resultsCard  = $('resultsCard');
+        const resetBtn     = $('resetBtn');
+
+        if (timerCircle)  timerCircle.className = 'timer-circle completed';
+        if (timerDisplay) { timerDisplay.textContent = '\u2713'; timerDisplay.classList.remove('timer-counting'); }
+        if (statusText)   statusText.textContent = '测试完成';
 
         // 震动 + 蜂鸣 + 语音
         vibrate([300, 100, 300]);
@@ -322,8 +328,8 @@
         }
 
         // 显示UI
-        resultsCard.style.display = 'block';
-        resetBtn.style.display = 'inline-block';
+        if (resultsCard) resultsCard.style.display = 'block';
+        if (resetBtn)    resetBtn.style.display = 'inline-block';
 
         // 保存本次结果
         tripleResults[currentTestIndex - 1] = {
@@ -336,7 +342,8 @@
 
         // 启用下一次测试按钮
         if (currentTestIndex < 3) {
-            $(`testBtn${currentTestIndex + 1}`).disabled = false;
+            const nextBtn = $(`testBtn${currentTestIndex + 1}`);
+            if (nextBtn) nextBtn.disabled = false;
         }
 
         // 如果三次都完成，计算平均并生成最终报告
@@ -344,14 +351,13 @@
             computeAverageAndFinalize();
         }
 
-        // 保存单次测试历史记录（通过 DataExport 模块）
+        // 保存单次测试历史记录
         dataExport.saveRecord({
             features: currentResult.features,
             featureCount: Object.keys(currentResult.features).length,
-            mjPrediction: currentResult.mjPrediction,
             duration: currentResult.duration,
             patientInfo: getPatientInfo(),
-            rawData: currentRawData // 仅用于导出，不存入 localStorage
+            rawData: currentRawData
         });
 
         // 显示历史记录
@@ -365,12 +371,15 @@
         for (let i = 0; i < 3; i++) {
             const row = $(`resultRow${i + 1}`);
             const result = tripleResults[i];
-            if (result && result.result) {
+            if (result && result.result && row) {
                 const features = result.result.features;
-                const mj = result.result.mjPrediction;
-                row.querySelectorAll('.col')[1].textContent = features.step_count || '-';
-                row.querySelectorAll('.col')[2].textContent = features.step_frequency ? ((features.step_frequency * 60).toFixed(1)) : '-';
-                row.querySelectorAll('.col')[3].textContent = mj ? mj.score : '-';
+                const cols = row.querySelectorAll('.col');
+                cols[1].textContent = features.step_count != null ? features.step_count : '-';
+                cols[2].textContent = features.step_frequency
+                    ? (features.step_frequency * 60).toFixed(1) : '-';
+                // 晃动幅度：m² → cm²
+                const swayM2 = features.sway_area || 0;
+                cols[3].textContent = (swayM2 * 10000).toFixed(2);
             }
         }
     }
@@ -379,18 +388,13 @@
     // 计算三次平均值并完成最终结果
     // ============================================================
     function computeAverageAndFinalize() {
-        // 计算平均值（对数值型特征）
+        const keysToAvg = ['step_count', 'step_frequency', 'step_time_mean', 'step_time_std',
+                           'sway_area', 'sway_path_length', 'acc_total_std',
+                           'sample_entropy', 'signal_quality_score'];
+
         const avgFeatures = {};
-        const count = 3;
-
-        // 需要平均的关键参数
-        const keysToAvg = ['step_count', 'step_frequency', 'step_time_mean', 'step_time_std', 
-                         'sway_area', 'sway_path_length', 'acc_total_std', 
-                         'sample_entropy', 'signal_quality_score'];
-
         keysToAvg.forEach(key => {
-            let sum = 0;
-            let validCount = 0;
+            let sum = 0, validCount = 0;
             tripleResults.forEach(r => {
                 const val = r.result.features[key];
                 if (typeof val === 'number' && isFinite(val)) {
@@ -401,74 +405,63 @@
             avgFeatures[key] = validCount > 0 ? sum / validCount : 0;
         });
 
-        // 复制其他特征（使用第一次的非数值特征）
-        Object.assign(avgFeatures, tripleResults[0].result.features);
-
-        // 平均mJOA评分（四舍五入）
-        let mjSum = 0;
-        tripleResults.forEach(r => {
-            mjSum += r.result.mjPrediction ? r.result.mjPrediction.score : 0;
-        });
-        const avgMjScore = Math.round(mjSum / count);
-        const avgMjPrediction = {
-            score: avgMjScore,
-            confidence: 75,
-            description: balanceGrade[avgMjScore]
-        };
+        // 复制第一次的其他特征作为基底
+        const mergedFeatures = Object.assign({}, tripleResults[0].result.features, avgFeatures);
+        currentResult.features = mergedFeatures;
 
         // 更新平均表格
-        $('avgSteps').textContent = avgFeatures.step_count ? avgFeatures.step_count.toFixed(1) : '-';
-        $('avgCadence').textContent = avgFeatures.step_frequency ? (avgFeatures.step_frequency * 60).toFixed(1) : '-';
-        $('avgMjOA').textContent = avgMjScore;
+        const avgStepsEl    = $('avgSteps');
+        const avgCadenceEl  = $('avgCadence');
+        const avgSwayAreaEl = $('avgSwayArea');
 
-        // 保存最终平均结果
-        currentResult.features = Object.assign({}, currentResult.features, avgFeatures);
-        currentResult.mjPrediction = avgMjPrediction;
+        if (avgStepsEl)    avgStepsEl.textContent    = avgFeatures.step_count ? avgFeatures.step_count.toFixed(1) : '-';
+        if (avgCadenceEl)  avgCadenceEl.textContent  = avgFeatures.step_frequency ? (avgFeatures.step_frequency * 60).toFixed(1) : '-';
+        if (avgSwayAreaEl) avgSwayAreaEl.textContent = ((avgFeatures.sway_area || 0) * 10000).toFixed(2);
 
         speak('三次测试完成，结果已生成');
     }
 
-    // 平衡等级描述映射
-    const balanceGrade = {
-        4: '正常',
-        3: '正常',
-        2: '轻度异常',
-        1: '重度异常',
-        0: '重度异常'
-    };
+    // 平衡等级描述映射 - 基于sway_area (m²单位，换算cm²后显示)
+    function getBalanceGrade(swayAreaM2) {
+        if (swayAreaM2 < 0.00005) return 'normal';   // < 0.5 cm²
+        if (swayAreaM2 < 0.0005)  return 'mild';     // 0.5 ~ 5 cm²
+        return 'severe';                              // > 5 cm²
+    }
 
-    const balanceGradeClass = {
-        4: 'grade-excellent',
-        3: 'grade-excellent',
-        2: 'grade-good',
-        1: 'grade-poor',
-        0: 'grade-poor'
-    };
+    const balanceGradeText  = { normal: '正常', mild: '轻度异常', severe: '重度异常' };
+    const balanceGradeClass = { normal: 'grade-excellent', mild: 'grade-good', severe: 'grade-poor' };
 
     // ============================================================
     // 显示结果
     // ============================================================
     function displayResults(result) {
-        const params = result.features || result.params;
         const gaitSpecific = result.categories?.gaitSpecific || {};
+        const features = result.features || {};
 
-        const stepsResult = $('stepsResult');
-        const balanceGradeResult = $('balanceGradeResult');
-        const detailParams = $('detailParams');
+        const stepsResult       = $('stepsResult');
+        const swayAreaResult    = $('swayAreaResult');
+        const balanceGradeResult= $('balanceGradeResult');
+        const detailParams      = $('detailParams');
         const detailToggleArrow = $('detailToggleArrow');
 
         if (stepsResult) stepsResult.textContent = gaitSpecific.step_count || 0;
-        const score = result.mjPrediction?.score || 0;
+
+        // 晃动幅度：m² → cm²
+        const swayM2 = features.sway_area || 0;
+        const swayCm2 = (swayM2 * 10000).toFixed(2);
+        if (swayAreaResult) swayAreaResult.textContent = swayCm2;
+
+        // 平衡分级
+        const grade = getBalanceGrade(swayM2);
         if (balanceGradeResult) {
-            balanceGradeResult.textContent = balanceGrade[score] || '-';
-            balanceGradeResult.className = 'result-value ' + balanceGradeClass[score];
+            balanceGradeResult.textContent = balanceGradeText[grade];
+            balanceGradeResult.className   = 'result-value ' + balanceGradeClass[grade];
         }
 
         // 隐藏详细参数
         if (detailParams) detailParams.style.display = 'none';
         if (detailToggleArrow) detailToggleArrow.classList.remove('expanded');
 
-        // 填充详细参数
         fillDetailParams(result);
     }
 
@@ -590,8 +583,7 @@
         if (!currentResult) return;
         const patientInfo = getPatientInfo();
         dataExport.exportFeaturesCSV({
-            features: currentResult.features,
-            mjPrediction: currentResult.mjPrediction
+            features: currentResult.features
         }, `gaitomics_${formatTimestamp(new Date())}`, patientInfo);
     }
 
@@ -609,41 +601,39 @@
             return;
         }
 
-        // 生成CSV内容但不下载，用于邮件附件
         const patientInfo = getPatientInfo();
         const csvContent = dataExport.exportFeaturesCSV({
-            features: currentResult.features,
-            mjPrediction: currentResult.mjPrediction
+            features: currentResult.features
         }, `gaitomics_${formatTimestamp(new Date())}`, patientInfo);
 
-        // 构建mailto链接
-        // 注意：mailto对附件大小有限制，一般几KB可以，太大无法附件
-        // 所以我们把CSV内容放在正文里，收件人填写用户输入
         const patientStr = [
-            patientInfo.name ? `姓名：${patientInfo.name}` : '',
-            patientInfo.gender ? `性别：${patientInfo.gender}` : '',
-            patientInfo.age ? `年龄：${patientInfo.age}岁` : '',
-            patientInfo.id ? `住院号：${patientInfo.id}` : '',
+            patientInfo.name      ? `姓名：${patientInfo.name}`        : '',
+            patientInfo.gender    ? `性别：${patientInfo.gender}`       : '',
+            patientInfo.age       ? `年龄：${patientInfo.age}岁`        : '',
+            patientInfo.id        ? `住院号：${patientInfo.id}`         : '',
             patientInfo.diagnosis ? `初步诊断：${patientInfo.diagnosis}` : ''
         ].filter(s => s).join('%0D%0A');
 
-        const mjScore = currentResult.mjPrediction ? currentResult.mjPrediction.score : 'N/A';
-        const mjDesc = currentResult.mjPrediction ? currentResult.mjPrediction.description : '';
-        const stepCount = currentResult.features ? currentResult.features.step_count : 'N/A';
-        const stepFreq = currentResult.features ? (currentResult.features.step_frequency * 60).toFixed(1) : 'N/A';
+        const features   = currentResult.features || {};
+        const stepCount  = features.step_count != null ? features.step_count : 'N/A';
+        const stepFreq   = features.step_frequency ? (features.step_frequency * 60).toFixed(1) : 'N/A';
+        const swayM2     = features.sway_area || 0;
+        const swayCm2    = (swayM2 * 10000).toFixed(2);
+        const grade      = getBalanceGrade(swayM2);
+        const gradeText  = balanceGradeText[grade];
 
         let body = `${patientStr}%0D%0A%0D%0A`;
         body += `测试结果：%0D%0A`;
         body += `步数：${stepCount} 步%0D%0A`;
         body += `步频：${stepFreq} 步/分钟%0D%0A`;
-        body += `mJOA下肢评分：${mjScore}/4 (${mjDesc})%0D%0A%0D%0A`;
-        body += `完整CSV数据见附件。由于浏览器限制，如果附件没有显示，请手动复制下方CSV内容保存：%0D%0A%0D%0A`;
+        body += `晃动幅度：${swayCm2} cm²%0D%0A`;
+        body += `平衡分级：${gradeText}%0D%0A%0D%0A`;
+        body += `完整CSV数据见附件。如附件未显示，请手动复制以下CSV内容保存：%0D%0A%0D%0A`;
         body += encodeURIComponent(csvContent);
 
-        const subject = encodeURIComponent(`GaitOmics步态分析报告 - ${patientInfo.name || '未命名'}`);
-        const mailtoUrl = `mailto:${emailAddr}?subject=${subject}&body=${body}`;
+        const subject    = encodeURIComponent(`GaitOmics步态分析报告 - ${patientInfo.name || '未命名'}`);
+        const mailtoUrl  = `mailto:${emailAddr}?subject=${subject}&body=${body}`;
 
-        // 打开mailto链接，唤起系统默认邮件客户端
         window.location.href = mailtoUrl;
     }
 
@@ -670,57 +660,53 @@
     // ============================================================
 
     function renderHistory() {
+        const historyCard = $('historyCard');
+        const historyList = $('historyList');
         const history = dataExport.getHistory();
         if (history.length === 0) {
-            historyCard.style.display = 'none';
+            if (historyCard) historyCard.style.display = 'none';
             return;
         }
 
-        historyCard.style.display = 'block';
-        // getHistory 返回按时间正序，取最近5条
+        if (historyCard) historyCard.style.display = 'block';
         const recent = history.slice(-5).reverse();
 
-        historyList.innerHTML = recent.map((record, index) => {
-            const date = new Date(record.timestamp);
+        if (historyList) historyList.innerHTML = recent.map((record) => {
+            const date    = new Date(record.timestamp);
             const timeStr = `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-            
-            const mjScore = record.mjPrediction?.score || 0;
-            const stepCount = record.features?.step_count || 0;
-            const stepFreq = record.features?.step_frequency || 0;
-            const cadence = (stepFreq * 60).toFixed(1);
-            
-            let scoreClass = '';
-            if (mjScore >= 3) scoreClass = 'grade-excellent';
-            else if (mjScore >= 2) scoreClass = 'grade-good';
-            else scoreClass = 'grade-poor';
+            const stepCount  = record.features?.step_count || 0;
+            const swayM2     = record.features?.sway_area || 0;
+            const swayCm2    = (swayM2 * 10000).toFixed(2);
+            const grade      = getBalanceGrade(swayM2);
+            const gradeClass = balanceGradeClass[grade];
+            const gradeText  = balanceGradeText[grade];
 
             return `<div class="history-item" onclick="app.viewHistoryDetail('${record.id}')">
                 <span class="history-item-time">${timeStr}</span>
                 <div class="history-item-scores">
-                    <span class="history-item-score">评分 <strong class="${scoreClass}">${mjScore}</strong></span>
-                    <span class="history-item-score">步频 <strong>${cadence}</strong></span>
+                    <span class="history-item-score">步数 <strong>${stepCount}</strong></span>
+                    <span class="history-item-score">平衡 <strong class="${gradeClass}">${gradeText}</strong></span>
+                    <span class="history-item-score">晃动 <strong>${swayCm2}cm²</strong></span>
                 </div>
             </div>`;
         }).join('');
     }
 
     function viewHistoryDetail(id) {
-        const record = dataExport.getRecordById(id);
+        const record   = dataExport.getRecordById(id);
         if (!record) return;
-
         const features = record.features || {};
-        const mjPred = record.mjPrediction || {};
+        const swayM2   = features.sway_area || 0;
+        const grade    = getBalanceGrade(swayM2);
         const lines = [
             `测试时间：${new Date(record.timestamp).toLocaleString('zh-CN')}`,
             ``,
-            `步数：${features.step_count || '-'} 步`,
+            `步数：${features.step_count ?? '-'} 步`,
             `步频：${((features.step_frequency || 0) * 60).toFixed(1)} 步/分钟`,
-            `mJOA评分：${mjPred.score || '-'} / 4`,
-            `功能描述：${mjPred.description || '-'}`,
-            `置信度：${mjPred.confidence || '-'}%`,
+            `晃动幅度：${(swayM2 * 10000).toFixed(2)} cm²`,
+            `平衡分级：${balanceGradeText[grade]}`,
             `特征数：${record.featureCount || 0}`
         ];
-
         alert(lines.join('\n'));
     }
 
@@ -778,22 +764,27 @@
     function resetAllTests() {
         tripleResults = [null, null, null];
         currentTestIndex = 1;
-        if (testBtn1) testBtn1.disabled = false;
-        if (testBtn2) testBtn2.disabled = true;
-        if (testBtn3) testBtn3.disabled = true;
+
+        const testBtn1 = $('testBtn1');
+        const testBtn2 = $('testBtn2');
+        const testBtn3 = $('testBtn3');
+        if (testBtn1) { testBtn1.disabled = false; testBtn1.style.opacity = ''; }
+        if (testBtn2) { testBtn2.disabled = true;  testBtn2.style.opacity = ''; }
+        if (testBtn3) { testBtn3.disabled = true;  testBtn3.style.opacity = ''; }
 
         // 清空表格
         for (let i = 0; i < 3; i++) {
             const row = $(`resultRow${i + 1}`);
             if (row) {
-                row.querySelectorAll('.col')[1].textContent = '-';
-                row.querySelectorAll('.col')[2].textContent = '-';
-                row.querySelectorAll('.col')[3].textContent = '-';
+                const cols = row.querySelectorAll('.col');
+                cols[1].textContent = '-';
+                cols[2].textContent = '-';
+                cols[3].textContent = '-';
             }
         }
-        if ($('avgSteps')) $('avgSteps').textContent = '-';
-        if ($('avgCadence')) $('avgCadence').textContent = '-';
-        if ($('avgMjOA')) $('avgMjOA').textContent = '-';
+        if ($('avgSteps'))    $('avgSteps').textContent    = '-';
+        if ($('avgCadence'))  $('avgCadence').textContent  = '-';
+        if ($('avgSwayArea')) $('avgSwayArea').textContent = '-';
 
         resetTestUI();
     }
@@ -864,7 +855,8 @@
 
     window.addEventListener('orientationchange', () => {
         console.log('屏幕方向改变');
-        if (waveformCard.style.display !== 'none') {
+        const wc = $('waveformCard');
+        if (wc && wc.style.display !== 'none') {
             initCanvas();
         }
     });
