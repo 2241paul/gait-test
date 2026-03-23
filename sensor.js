@@ -61,7 +61,7 @@ class SensorManager {
      * 请求传感器权限（iOS 13+需要）
      */
     async requestPermission() {
-        // iOS DeviceMotion权限
+        // iOS DeviceMotion权限 - 始终请求，因为无论如何我们都可能回退到它
         if (typeof DeviceMotionEvent !== 'undefined' &&
             typeof DeviceMotionEvent.requestPermission === 'function') {
             try {
@@ -256,6 +256,10 @@ class SensorManager {
             try { this.gyroscope.stop(); } catch(e) {}
             this.gyroscope = null;
         }
+        if (this._magnetometer) {
+            try { this._magnetometer.stop(); } catch(e) {}
+            this._magnetometer = null;
+        }
         
         this.apiType = 'devicemotion';
         this._startDeviceMotion();
@@ -361,8 +365,8 @@ class SensorManager {
         const p1 = buffer[idx + 1];
         const dt = p1.t - p0.t;
         
-        if (dt < 0.5) { // 避免除零，且间距过小说明数据有问题
-            const alpha = dt > 0 ? (now - p0.t) / dt : 0.5;
+        if (dt > 0) { // dt单位是毫秒，只要间隔大于0就插值
+            const alpha = (now - p0.t) / dt;
             const x = p0.x + alpha * (p1.x - p0.x);
             const y = p0.y + alpha * (p1.y - p0.y);
             const z = p0.z + alpha * (p1.z - p0.z);
