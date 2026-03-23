@@ -15,11 +15,11 @@ class GaitAnalyzer {
      * @returns {Object} 完整分析结果
      */
     analyze(rawData) {
-        // 1. 预处理：分离数据流
+        // 1. 预处理：分离数据流 + 预滤波
         const processed = this._preprocessData(rawData);
 
-        // 2. 步态事件检测
-        const stepDetection = this._detectSteps(processed);
+        // 2. 步态事件检测（用原始rawData，步检测有自己的带通滤波链，不依赖预滤波）
+        const stepDetection = this._detectStepsFromRaw(rawData);
 
         // 3. 提取所有特征（7大类）
         const timeDomain = this._extractTimeDomain(processed);
@@ -69,15 +69,49 @@ class GaitAnalyzer {
         const accelData = rawData.filter(d => d.type === 'accel');
         const gyroData = rawData.filter(d => d.type === 'gyro');
 
-        // 计算矢量模
-        const processedAccel = accelData.map(d => ({
+        // ── V1.1: 预滤波流程 ──
+        // 步态信号有效频率成分在 0.5~10Hz 范围内，
+        // 10Hz以上的高频成分为传感器电子噪声/手指抖动，需去除。
+        // 预滤波仅作用于后续特征提取的副本数据，不影响步检测（步检测有自己的滤波链）。
+        const PRE_FILTER_CUTOFF = 10; // Hz — 二阶Butterworth低通截止频率
+
+        // 对加速度三轴分别做：中值滤波(3pt) → 低通滤波(10Hz)
+        const filterAxis = (data, axis) => {
+            const raw = data.map(d => d[axis]);
+            const medfilt = this._medianFilter3(raw);
+            return this._butterLowPass(medfilt, PRE_FILTER_CUTOFF, this.targetSampleRate);
+        };
+        const accX = accelData.length > 0 ? filterAxis(accelData, 'x') : [];
+        const accY = accelData.length > 0 ? filterAxis(accelData, 'y') : [];
+        const accZ = accelData.length > 0 ? filterAxis(accelData, 'z') : [];
+
+        const gyrX = gyroData.length > 0 ? filterAxis(gyroData, 'x') : [];
+        const gyrY = gyroData.length > 0 ? filterAxis(gyroData, 'y') : [];
+        const gyrZ = gyroData.length > 0 ? filterAxis(gyroData, 'z') : [];
+
+        // 计算矢量模（基于滤波后的数据）
+        const processedAccel = accelData.map((d, i) => ({
             ...d,
-            total: Math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+            x: accX[i] !== undefined ? accX[i] : d.x,
+            y: accY[i] !== undefined ? accY[i] : d.y,
+            z: accZ[i] !== undefined ? accZ[i] : d.z,
+            total: Math.sqrt(
+                (accX[i] !== undefined ? accX[i] : d.x) ** 2 +
+                (accY[i] !== undefined ? accY[i] : d.y) ** 2 +
+                (accZ[i] !== undefined ? accZ[i] : d.z) ** 2
+            )
         }));
 
-        const processedGyro = gyroData.map(d => ({
+        const processedGyro = gyroData.map((d, i) => ({
             ...d,
-            total: Math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+            x: gyrX[i] !== undefined ? gyrX[i] : d.x,
+            y: gyrY[i] !== undefined ? gyrY[i] : d.y,
+            z: gyrZ[i] !== undefined ? gyrZ[i] : d.z,
+            total: Math.sqrt(
+                (gyrX[i] !== undefined ? gyrX[i] : d.x) ** 2 +
+                (gyrY[i] !== undefined ? gyrY[i] : d.y) ** 2 +
+                (gyrZ[i] !== undefined ? gyrZ[i] : d.z) ** 2
+            )
         }));
 
         const allTimestamps = rawData.map(d => d.timestamp);
@@ -94,42 +128,60 @@ class GaitAnalyzer {
         };
     }
 
-    // ====== 2. 步态事件检测 ======
+    // ====== 2. 步态事件检测（加速度+陀螺仪双传感器融合）======
 
-    _detectSteps(processed) {
-        const accel = processed.accel;
-        if (accel.length < 20) return { steps: [], filtered: [] };
+    _detectStepsFromRaw(rawData) {
+        const accelData = rawData.filter(d => d.type === 'accel').map(d => ({
+            ...d,
+            total: Math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+        }));
+        const gyroData = rawData.filter(d => d.type === 'gyro').map(d => ({
+            ...d,
+            total: Math.sqrt(d.x * d.x + d.y * d.y + d.z * d.z)
+        }));
+
+        if (accelData.length < 20) return { steps: [], filtered: [] };
 
         /* -----------------------------------------------------------
-         * 踵趾步行步检测优化策略：
-         * 1. 使用矢量模信号，对任意握持方向鲁棒
-         * 2. 带通滤波锁定踵趾步行频率范围 0.5~2 Hz
-         * 3. 提高阈值到 mean + 0.6*std，减少噪声误触发
-         * 4. 最小步间隔 500ms（≤120步/分钟，踵趾步行实际50~80步/分钟）
-         * 5. 添加移动平均平滑，消除传感器抖动
+         * V1.1 踵趾步行步检测优化策略：
+         * 1. 加速度通道：矢量模 + 移动均值 + 带通0.5~2Hz + 峰值检测（同V1.0）
+         * 2. 陀螺仪通道：矢量模 + 带通0.5~3Hz + 包络能量计算
+         * 3. 融合验证：加速度检测到候选峰时，检查对应时间窗口内
+         *    陀螺仪是否有足够的角速度能量。无能量则可能是误检（仅手抖无身体旋转）。
          * ----------------------------------------------------------- */
 
-        // 1. 取矢量模（方向无关）
-        const totalSignal = accel.map(d => d.total);
-
-        // 2. 移动均值平滑（窗口5点 = 50ms @100Hz），去除高频抖动
+        // ── 加速度通道（主检测）──
+        const totalSignal = accelData.map(d => d.total);
         const smoothed = this._movingAverage(totalSignal, 5);
-
-        // 3. 带通滤波 0.5~2Hz
         const filtered = this._bandpassFilter(smoothed, 0.5, 2.0, this.targetSampleRate);
 
-        // 4. 峰值检测
-        const steps = [];
-        const minIntervalMs = 500;     // 最小步间隔 500ms
-        const windowSize   = 8;        // 峰值检测窗口（前后各8点 = 80ms）
+        // ── 陀螺仪通道（辅助验证）──
+        // 踵趾步行时身体左右摆动产生Y轴（ML方向）为主、Z轴（上下）为辅的角速度
+        // 用陀螺仪矢量模捕获整体旋转
+        let gyroEnvelope = null;
+        const gyroSampleRate = Math.round(gyroData.length > 1
+            ? 1000 / ((gyroData[gyroData.length - 1].timestamp - gyroData[0].timestamp) / (gyroData.length - 1))
+            : this.targetSampleRate);
 
-        const mean  = this._mean(filtered);
-        const std   = this._std(filtered);
-        // 阈值：mean + 0.6*std，低于此高度的峰忽略
+        if (gyroData.length > 20) {
+            const gyroTotal = gyroData.map(d => d.total);
+            // 带通0.5~3Hz（比加速度稍宽，因为身体旋转频率可能略高）
+            const gyroFiltered = this._bandpassFilter(gyroTotal, 0.5, 3.0, gyroSampleRate);
+            // 取绝对值 + 移动均值平滑 → 得到"能量包络"
+            const gyroAbs = gyroFiltered.map(v => Math.abs(v));
+            gyroEnvelope = this._movingAverage(gyroAbs, 10); // 100ms窗口平滑
+        }
+
+        // ── 融合峰值检测 ──
+        const steps = [];
+        const minIntervalMs = 500;
+        const windowSize = 8;
+
+        const mean = this._mean(filtered);
+        const std = this._std(filtered);
         const threshold = mean + 0.6 * std;
 
         for (let i = windowSize; i < filtered.length - windowSize; i++) {
-            // 判断局部峰
             let isPeak = true;
             for (let j = 1; j <= windowSize; j++) {
                 if (filtered[i] <= filtered[i - j] || filtered[i] <= filtered[i + j]) {
@@ -140,11 +192,27 @@ class GaitAnalyzer {
 
             if (!isPeak || filtered[i] <= threshold) continue;
 
-            const ts = accel[i].timestamp;
+            // 陀螺仪验证：检查加速度峰对应时间窗口内陀螺仪是否有足够能量
+            if (gyroEnvelope && gyroEnvelope.length > 0) {
+                // 用时间戳映射找到陀螺仪对应的索引范围
+                const ts = accelData[i].timestamp;
+                const searchWindowMs = 150; // ±150ms搜索窗口
+                const gyroEnergy = this._getGyroEnergyInWindow(gyroData, gyroEnvelope, ts, searchWindowMs);
+
+                // 陀螺仪能量阈值：取整个信号的25百分位数作为基线
+                const gyroThreshold = this._percentile(gyroEnvelope, 25);
+                // 如果陀螺仪能量极低（低于基线），说明这可能是噪声误检
+                // 但不能完全排除（有些患者步态旋转确实很弱），所以只在能量为0时才排除
+                if (gyroEnergy < gyroThreshold * 0.3 && gyroThreshold > 0.001) {
+                    continue; // 跳过此候选步
+                }
+            }
+
+            const ts = accelData[i].timestamp;
             if (steps.length === 0 || (ts - steps[steps.length - 1].timestamp) >= minIntervalMs) {
                 steps.push({
                     timestamp: ts,
-                    t: accel[i].t,
+                    t: accelData[i].t,
                     amplitude: filtered[i] - mean,
                     index: i
                 });
@@ -152,6 +220,37 @@ class GaitAnalyzer {
         }
 
         return { steps, filtered };
+    }
+
+    /**
+     * 获取指定时间窗口内的陀螺仪能量包络平均值
+     */
+    _getGyroEnergyInWindow(gyroData, gyroEnvelope, centerTimestamp, windowMs) {
+        let sum = 0, count = 0;
+        const halfWindow = windowMs / 2;
+
+        for (let i = 0; i < gyroData.length; i++) {
+            const dt = Math.abs(gyroData[i].timestamp - centerTimestamp);
+            if (dt <= halfWindow && i < gyroEnvelope.length) {
+                sum += gyroEnvelope[i];
+                count++;
+            }
+        }
+
+        return count > 0 ? sum / count : 0;
+    }
+
+    /**
+     * 计算百分位数
+     */
+    _percentile(arr, p) {
+        if (!arr || arr.length === 0) return 0;
+        const sorted = [...arr].sort((a, b) => a - b);
+        const idx = (p / 100) * (sorted.length - 1);
+        const lower = Math.floor(idx);
+        const upper = Math.ceil(idx);
+        if (lower === upper) return sorted[lower];
+        return sorted[lower] + (sorted[upper] - sorted[lower]) * (idx - lower);
     }
 
     /**
@@ -168,6 +267,22 @@ class GaitAnalyzer {
                 cnt++;
             }
             result[i] = sum / cnt;
+        }
+        return result;
+    }
+
+    /**
+     * 3点中值滤波 — 去除脉冲噪声（异常尖峰），不模糊信号边缘
+     * 对每个点取其前后共3个值的中值
+     */
+    _medianFilter3(signal) {
+        if (signal.length === 0) return [];
+        const result = new Array(signal.length);
+        for (let i = 0; i < signal.length; i++) {
+            const a = signal[Math.max(0, i - 1)];
+            const b = signal[i];
+            const c = signal[Math.min(signal.length - 1, i + 1)];
+            result[i] = Math.max(Math.min(a, b), Math.min(Math.max(a, b), c)); // 3值中值
         }
         return result;
     }
@@ -419,7 +534,7 @@ class GaitAnalyzer {
         }
 
         // --- Sway（摆动/晃动）参数 ---
-        const sway = this._computeSway(accel);
+        const sway = this._computeSway(accel, processed.gyro);
         Object.assign(result, sway);
 
         // --- Jerk（加加速度） ---
@@ -439,13 +554,15 @@ class GaitAnalyzer {
         return result;
     }
 
-    _computeSway(accel) {
+    _computeSway(accel, gyro = []) {
         if (accel.length < 10) {
             return {
                 sway_path_length: 0, sway_velocity_mean: 0, sway_velocity_std: 0,
                 sway_velocity_max: 0, sway_area: 0, sway_ellipse_area: 0,
                 sway_ellipse_major: 0, sway_ellipse_minor: 0, sway_ellipse_orientation: 0,
-                acc_sway_rms_ap: 0, acc_sway_rms_ml: 0, acc_sway_rms_vert: 0, acc_sway_rms_3d: 0
+                acc_sway_rms_ap: 0, acc_sway_rms_ml: 0, acc_sway_rms_vert: 0, acc_sway_rms_3d: 0,
+                gyro_sway_rms_ml: 0, gyro_sway_rms_ap: 0, gyro_sway_rms_3d: 0,
+                combined_balance_index: 0
             };
         }
 
@@ -476,6 +593,33 @@ class GaitAnalyzer {
         const rmsVert = this._rms(vertDyn);
         // 三维综合 RMS（三方向均方根合成）
         const rms3D   = Math.sqrt((rmsAP * rmsAP + rmsML * rmsML + rmsVert * rmsVert) / 3);
+
+        // ---- 陀螺仪 RMS（V1.1新增：反映身体旋转晃动烈度）----
+        // 踵趾步行中身体左右摆动（Y轴/ML方向）和前后晃动（X轴/AP方向）会产生角速度
+        // 陀螺仪RMS与加速度RMS互补：加速度反映位移幅度，陀螺仪反映旋转速度
+        let gyroRMSML = 0, gyroRMSAP = 0, gyroRMS3D = 0;
+        if (gyro.length > 10) {
+            const gyroAP  = gyro.map(d => d.x);  // 前后旋转（俯仰）
+            const gyroML  = gyro.map(d => d.y);  // 左右旋转（侧倾）
+            const gyroVert= gyro.map(d => d.z);  // 上下旋转（偏航）
+
+            const gyroAPDyn   = this._removeMean(gyroAP);
+            const gyroMLDyn   = this._removeMean(gyroML);
+            const gyroVertDyn = this._removeMean(gyroVert);
+
+            gyroRMSAP = this._rms(gyroAPDyn);
+            gyroRMSML = this._rms(gyroMLDyn);
+            const gyroRMSVert = this._rms(gyroVertDyn);
+            gyroRMS3D = Math.sqrt((gyroRMSAP * gyroRMSAP + gyroRMSML * gyroRMSML + gyroRMSVert * gyroRMSVert) / 3);
+        }
+
+        // ---- 合成平衡指数（V1.1新增）----
+        // 结合加速度和陀螺仪的综合平衡指标
+        // 公式：combined_balance_index = sqrt(acc_rms_3d^2 + (gyro_rms_3d * k)^2)
+        // 其中 k 是经验系数，将角速度单位(rad/s)转换为等效加速度单位(m/s²)
+        // 参考：典型步态中，1 rad/s 角速度约对应 0.5 m/s² 的离心加速度（a = ω²r, r≈0.5m）
+        const k = 0.5; // 转换系数
+        const combinedBalanceIndex = Math.sqrt(rms3D * rms3D + (gyroRMS3D * k) * (gyroRMS3D * k));
 
         // ---- 位移轨迹（AP × ML 平面）----
         const dt = 1 / this.targetSampleRate;
@@ -545,7 +689,13 @@ class GaitAnalyzer {
             acc_sway_rms_ap:         this._round(rmsAP,   4),   // 前后
             acc_sway_rms_ml:         this._round(rmsML,   4),   // 左右
             acc_sway_rms_vert:       this._round(rmsVert, 4),   // 上下
-            acc_sway_rms_3d:         this._round(rms3D,   4)    // 综合三维
+            acc_sway_rms_3d:         this._round(rms3D,   4),   // 综合三维
+            // V1.1新增：陀螺仪RMS（反映身体旋转晃动）
+            gyro_sway_rms_ap:        this._round(gyroRMSAP,  4), // 前后旋转
+            gyro_sway_rms_ml:        this._round(gyroRMSML,  4), // 左右旋转
+            gyro_sway_rms_3d:        this._round(gyroRMS3D,  4), // 综合三维旋转
+            // V1.1新增：合成平衡指数（加速度+陀螺仪融合）
+            combined_balance_index:  this._round(combinedBalanceIndex, 4)
         };
     }
 
@@ -728,6 +878,18 @@ class GaitAnalyzer {
         result.power_spectral_ratio_lf_hf = hfPower > 0
             ? this._round(lfPower / hfPower, 4) : 0;
 
+        // V1.1新增：频段能量占比（归一化，不受个体运动幅度影响）
+        const totalPower = lfPower + hfPower + (fft.psdBands['0-0.5'] || 0);
+        if (totalPower > 0) {
+            result.low_freq_energy_ratio = this._round(lfPower / totalPower, 4);   // 0.5-2Hz占比
+            result.high_freq_energy_ratio = this._round(hfPower / totalPower, 4);  // 2-10Hz占比
+            result.ultra_low_freq_ratio = this._round((fft.psdBands['0-0.5'] || 0) / totalPower, 4); // <0.5Hz占比
+        } else {
+            result.low_freq_energy_ratio = 0;
+            result.high_freq_energy_ratio = 0;
+            result.ultra_low_freq_ratio = 0;
+        }
+
         // 近似最大Lyapunov指数
         result.lyapunov_exponent_approx = this._round(this._lyapunovExponent(accSignal), 4);
 
@@ -739,7 +901,8 @@ class GaitAnalyzer {
         ['sample_entropy', 'gyro_sample_entropy', 'approx_entropy',
          'hurst_exponent', 'gyro_hurst_exponent', 'fractal_dimension_dfa',
          'mutual_info_xy', 'mutual_info_xz', 'mutual_info_yz',
-         'power_spectral_ratio_lf_hf', 'lyapunov_exponent_approx'
+         'power_spectral_ratio_lf_hf', 'lyapunov_exponent_approx',
+         'low_freq_energy_ratio', 'high_freq_energy_ratio', 'ultra_low_freq_ratio'
         ].forEach(k => r[k] = 0);
         return r;
     }

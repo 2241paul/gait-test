@@ -98,8 +98,8 @@ class DataExport {
             '频域':         ['fft', 'psd', 'spectral', 'dominant'],
             '步态专项':     ['step_', 'stride_', 'stance_', 'swing_', 'sway_', 'jerk_',
                             'net_', 'total_length', 'directness', 'lateral_', 'forward_',
-                            'rhythmicity', 'autocorr', 'acc_sway_'],
-            '非线性动力学': ['entropy', 'hurst', 'fractal', 'mutual_', 'power_spectral', 'lyapunov'],
+                            'rhythmicity', 'autocorr', 'acc_sway_', 'gyro_sway_', 'combined_balance'],
+            '非线性动力学': ['entropy', 'hurst', 'fractal', 'mutual_', 'power_spectral', 'lyapunov', 'low_freq', 'high_freq', 'ultra_low_freq'],
             '时间分段':     ['diff', 'quarter', 'trend'],
             '质控':         ['signal_', 'noise_', 'missing_', 'sampling_',
                             'accelerometer_', 'temperature_', 'valid_']
