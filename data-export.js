@@ -62,83 +62,107 @@ class DataExport {
     // ====== CSV导出 ======
 
     /**
-     * 导出单次测试的特征为CSV
-     * @param {Object} record - 包含features的对象
-     * @param {string} filename - 文件名
-     * @param {Object} patientInfo - 患者信息
+     * 导出三次测试+平均值的特征为CSV（宽表格式）
+     * 列：参数名 | 第1次 | 第2次 | 第3次 | 平均值
+     *
+     * @param {Object[]} tripleFeatures - 长度3的数组，每项为单次features对象（null表示未测）
+     * @param {Object}   avgFeatures    - 平均值features对象
+     * @param {string}   filename       - 文件名（不含扩展名）
+     * @param {Object}   patientInfo    - 患者信息（可选）
+     * @param {boolean}  noDownload     - 若为true，只返回csv文本，不触发文件下载
+     * @returns {string} csv文本内容（用于邮件发送）
      */
-    exportFeaturesCSV(record, filename = 'gait_features', patientInfo = null) {
-        const features = record.features || {};
-        const now = new Date().toISOString();
-
+    exportFeaturesCSV(tripleFeatures, avgFeatures, filename = 'gait_features', patientInfo = null, noDownload = false) {
         // UTF-8 BOM头，确保Excel正确识别中文
         const bom = '\uFEFF';
-
         const rows = [];
 
-        // 患者信息放在最前面
+        // ── 患者信息区 ──
         if (patientInfo) {
-            rows.push('"患者信息","",""');
-            if (patientInfo.name) rows.push(`"姓名","${patientInfo.name}","${now}"`);
-            if (patientInfo.gender) rows.push(`"性别","${patientInfo.gender}","${now}"`);
-            if (patientInfo.age) rows.push(`"年龄","${patientInfo.age}","${now}"`);
-            if (patientInfo.id) rows.push(`"住院号","${patientInfo.id}","${now}"`);
-            if (patientInfo.diagnosis) rows.push(`"初步诊断","${patientInfo.diagnosis}","${now}"`);
+            rows.push('"患者信息","","","",""');
+            if (patientInfo.name)      rows.push(`"姓名","${patientInfo.name}","","",""`);
+            if (patientInfo.gender)    rows.push(`"性别","${patientInfo.gender}","","",""`);
+            if (patientInfo.age)       rows.push(`"年龄","${patientInfo.age}","","",""`);
+            if (patientInfo.id)        rows.push(`"住院号","${patientInfo.id}","","",""`);
+            if (patientInfo.diagnosis) rows.push(`"初步诊断","${patientInfo.diagnosis}","","",""`);
             rows.push('');
         }
 
-        // 表头
-        const headers = ['参数名', '参数值', '记录时间'];
-        rows.push(headers.join(','));
+        // ── 表头 ──
+        rows.push('"参数名","第1次","第2次","第3次","平均值"');
 
-        // 按分类排序
-        const categories = {
-            '时域统计': ['acc', 'gyr'],
-            '轴向分解': ['vert', 'ml', 'ap', 'x_peak', 'y_peak', 'z_peak'],
-            '频域': ['fft', 'psd', 'spectral', 'dominant'],
-            '步态专项': ['step_', 'stride_', 'stance_', 'swing_', 'sway_', 'jerk_', 'net_', 'total_length', 'directness', 'lateral_', 'forward_', 'rhythmicity', 'autocorr'],
+        // ── 按分类收集所有参数key ──
+        const categoryPrefixes = {
+            '时域统计':     ['acc', 'gyr'],
+            '轴向分解':     ['vert', 'ml', 'ap', 'x_peak', 'y_peak', 'z_peak'],
+            '频域':         ['fft', 'psd', 'spectral', 'dominant'],
+            '步态专项':     ['step_', 'stride_', 'stance_', 'swing_', 'sway_', 'jerk_',
+                            'net_', 'total_length', 'directness', 'lateral_', 'forward_',
+                            'rhythmicity', 'autocorr'],
             '非线性动力学': ['entropy', 'hurst', 'fractal', 'mutual_', 'power_spectral', 'lyapunov'],
-            '时间分段': ['diff', 'quarter', 'trend'],
-            '质控': ['signal_', 'noise_', 'missing_', 'sampling_', 'accelerometer_', 'temperature_', 'valid_']
+            '时间分段':     ['diff', 'quarter', 'trend'],
+            '质控':         ['signal_', 'noise_', 'missing_', 'sampling_',
+                            'accelerometer_', 'temperature_', 'valid_']
         };
 
-        // 已处理的key集合，避免重复
+        // 收集全部key（来自所有次 + 平均值）
+        const allKeys = new Set();
+        tripleFeatures.forEach(f => { if (f) Object.keys(f).forEach(k => allKeys.add(k)); });
+        if (avgFeatures) Object.keys(avgFeatures).forEach(k => allKeys.add(k));
+
+        // 格式化单个值
+        const fmt = (val) => {
+            if (val === undefined || val === null) return '';
+            if (typeof val === 'string') return `"${val.replace(/"/g, '""')}"`;
+            if (typeof val === 'number') return isFinite(val) ? val : '';
+            return `"${String(val)}"`;
+        };
+
+        // 输出一行参数数据
+        const writeRow = (key) => {
+            const v1  = fmt(tripleFeatures[0]?.[key]);
+            const v2  = fmt(tripleFeatures[1]?.[key]);
+            const v3  = fmt(tripleFeatures[2]?.[key]);
+            const avg = fmt(avgFeatures?.[key]);
+            rows.push(`"${key}",${v1},${v2},${v3},${avg}`);
+        };
+
         const processedKeys = new Set();
 
-        for (const [category, prefixes] of Object.entries(categories)) {
-            for (const [key, value] of Object.entries(features)) {
+        // 按分类顺序输出
+        for (const [category, prefixes] of Object.entries(categoryPrefixes)) {
+            let catWritten = false;
+            for (const key of allKeys) {
                 if (processedKeys.has(key)) continue;
-
                 const matches = prefixes.some(p => key.startsWith(p) || key.includes(p));
                 if (matches) {
-                    const safeKey = `"${key}"`;
-                    const safeValue = typeof value === 'string' ? `"${value}"` : value;
-                    rows.push(`${safeKey},${safeValue},"${now}"`);
+                    if (!catWritten) {
+                        rows.push(`"【${category}】","","","",""`);
+                        catWritten = true;
+                    }
+                    writeRow(key);
                     processedKeys.add(key);
                 }
             }
         }
 
-        // 处理未分类的参数
-        for (const [key, value] of Object.entries(features)) {
+        // 未分类参数
+        let uncatWritten = false;
+        for (const key of allKeys) {
             if (!processedKeys.has(key)) {
-                const safeKey = `"${key}"`;
-                const safeValue = typeof value === 'string' ? `"${value}"` : value;
-                rows.push(`${safeKey},${safeValue},"${now}"`);
+                if (!uncatWritten) {
+                    rows.push('"【其他参数】","","","",""');
+                    uncatWritten = true;
+                }
+                writeRow(key);
             }
         }
 
-        // 添加mJOA预测
-        if (record.mjPrediction) {
-            rows.push('');
-            rows.push('"mJOA评分","' + (record.mjPrediction.score || '') + '","' + now + '"');
-            rows.push('"置信度","' + (record.mjPrediction.confidence || '') + '","' + now + '"');
-            rows.push('"功能描述","' + (record.mjPrediction.description || '') + '","' + now + '"');
-        }
-
         const csv = bom + rows.join('\n');
-        this._downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
-        return csv; // 返回csv内容用于邮件发送
+        if (!noDownload) {
+            this._downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
+        }
+        return csv;
     }
 
     /**

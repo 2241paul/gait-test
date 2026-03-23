@@ -580,11 +580,23 @@
     // CSV 导出（委托给 DataExport 模块）
     // ============================================================
     function exportCSV() {
-        if (!currentResult) return;
         const patientInfo = getPatientInfo();
-        dataExport.exportFeaturesCSV({
-            features: currentResult.features
-        }, `gaitomics_${formatTimestamp(new Date())}`, patientInfo);
+        // 提取三次测试的features数组（未完成的次数传null）
+        const tripleFeatures = tripleResults.map(r => r ? r.result.features : null);
+
+        // 提取平均值features（若三次都完成则取currentResult，否则取已完成的最后一次）
+        let avgFeatures = null;
+        if (tripleResults.every(r => r !== null)) {
+            // 三次都完成，currentResult.features已是平均值（由computeAverageAndFinalize赋值）
+            avgFeatures = currentResult ? currentResult.features : null;
+        }
+
+        dataExport.exportFeaturesCSV(
+            tripleFeatures,
+            avgFeatures,
+            `gaitomics_${formatTimestamp(new Date())}`,
+            patientInfo
+        );
     }
 
     // ============================================================
@@ -602,9 +614,16 @@
         }
 
         const patientInfo = getPatientInfo();
-        const csvContent = dataExport.exportFeaturesCSV({
-            features: currentResult.features
-        }, `gaitomics_${formatTimestamp(new Date())}`, patientInfo);
+        const tripleFeatures = tripleResults.map(r => r ? r.result.features : null);
+        const avgFeatures = tripleResults.every(r => r !== null) && currentResult
+            ? currentResult.features : null;
+        const csvContent = dataExport.exportFeaturesCSV(
+            tripleFeatures,
+            avgFeatures,
+            `gaitomics_${formatTimestamp(new Date())}`,
+            patientInfo,
+            true  // noDownload：仅获取文本，不触发文件下载
+        );
 
         const patientStr = [
             patientInfo.name      ? `姓名：${patientInfo.name}`        : '',
