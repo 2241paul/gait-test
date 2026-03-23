@@ -806,26 +806,31 @@
     // 开始测试
     // ============================================================
     async function startTest(testIndex = 1) {
-        currentTestIndex = testIndex;
-        // 检查支持
-        const support = sensorManager.checkSensorSupport();
-        if (!support.accelerometer && !support.deviceMotion) {
-            alert('您的设备不支持传感器，请使用手机浏览器打开');
-            return;
+        try {
+            currentTestIndex = testIndex;
+            // 检查支持
+            const support = sensorManager.checkSensorSupport();
+            if (!support.accelerometer && !support.deviceMotion) {
+                alert('您的设备不支持传感器，请使用手机浏览器打开');
+                return;
+            }
+
+            // 请求权限
+            const hasPermission = await sensorManager.requestPermission();
+            if (!hasPermission) {
+                alert('需要传感器权限才能进行测试');
+                return;
+            }
+
+            // 重置状态
+            resetTestUI();
+
+            // 开始3秒准备倒计时
+            startPreparation();
+        } catch (e) {
+            console.error('startTest error:', e);
+            alert('启动测试出错：' + e.message);
         }
-
-        // 请求权限
-        const hasPermission = await sensorManager.requestPermission();
-        if (!hasPermission) {
-            alert('需要传感器权限才能进行测试');
-            return;
-        }
-
-        // 重置状态
-        resetTestUI();
-
-        // 开始3秒准备倒计时
-        startPreparation();
     }
 
     // ============================================================
