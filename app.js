@@ -24,33 +24,38 @@
     // 三次测试结果存储
     let tripleResults = [null, null, null]; // [test1, test2, test3]
 
-    // DOM 元素
+    // DOM 元素 - will be initialized after DOM load
     const $ = (id) => document.getElementById(id);
-    const timerCircle = $('timerCircle');
-    const timerDisplay = $('timerDisplay');
-    const statusText = $('statusText');
-    const testBtn1 = $('testBtn1');
-    const testBtn2 = $('testBtn2');
-    const testBtn3 = $('testBtn3');
-    const resetBtn = $('resetBtn');
-    const controlPanel = $('controlPanel');
-    const resultsCard = $('resultsCard');
-    const waveformCard = $('waveformCard');
-    const waveformCanvas = $('waveformCanvas');
-    const historyCard = $('historyCard');
-    const historyList = $('historyList');
-    const detailParams = $('detailParams');
-    const detailToggleText = $('detailToggleText');
-    const detailToggleArrow = $('detailToggleArrow');
-
-    // 结果显示元素
-    const stepsResult = $('stepsResult');
-    const balanceGradeResult = $('balanceGradeResult');
-
-    // Canvas 上下文
-    const ctx = waveformCanvas.getContext('2d');
+    let timerCircle, timerDisplay, statusText;
+    let testBtn1, testBtn2, testBtn3, resetBtn;
+    let resultsCard, waveformCard, waveformCanvas, historyCard, historyList;
+    let detailParams, detailToggleText, detailToggleArrow;
+    let stepsResult, balanceGradeResult;
+    let ctx;
     const WAVEFORM_WINDOW = 2000; // 显示最近2秒数据
     const WAVEFORM_UPDATE_INTERVAL = 50; // 50ms更新一次
+
+    // 延迟初始化DOM元素，等待DOM加载完成
+    function initDOM() {
+        timerCircle = $('timerCircle');
+        timerDisplay = $('timerDisplay');
+        statusText = $('statusText');
+        testBtn1 = $('testBtn1');
+        testBtn2 = $('testBtn2');
+        testBtn3 = $('testBtn3');
+        resetBtn = $('resetBtn');
+        resultsCard = $('resultsCard');
+        waveformCard = $('waveformCard');
+        waveformCanvas = $('waveformCanvas');
+        historyCard = $('historyCard');
+        historyList = $('historyList');
+        detailParams = $('detailParams');
+        detailToggleText = $('detailToggleText');
+        detailToggleArrow = $('detailToggleArrow');
+        stepsResult = $('stepsResult');
+        balanceGradeResult = $('balanceGradeResult');
+        ctx = waveformCanvas.getContext('2d');
+    }
 
     // ============================================================
     // 语音合成（Web Speech API）
@@ -848,6 +853,7 @@
     // 初始化
     // ============================================================
     window.addEventListener('load', () => {
+        initDOM();
         checkMobile();
         renderHistory();
     });

@@ -761,7 +761,7 @@ main {
 
 .form-row {
     display: flex;
-    gap: 20px;
+    gap: 16px;
 }
 
 .form-group {
@@ -769,10 +769,16 @@ main {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;
 }
 
 .form-group-full {
     flex: 1 1 100%;
+}
+
+/* 性别下拉框缩小宽度 */
+#patientGender {
+    max-width: 120px;
 }
 
 .form-group label {
