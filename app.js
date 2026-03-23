@@ -768,20 +768,22 @@
     function resetAllTests() {
         tripleResults = [null, null, null];
         currentTestIndex = 1;
-        testBtn1.disabled = false;
-        testBtn2.disabled = true;
-        testBtn3.disabled = true;
+        if (testBtn1) testBtn1.disabled = false;
+        if (testBtn2) testBtn2.disabled = true;
+        if (testBtn3) testBtn3.disabled = true;
 
         // 清空表格
         for (let i = 0; i < 3; i++) {
             const row = $(`resultRow${i + 1}`);
-            row.querySelectorAll('.col')[1].textContent = '-';
-            row.querySelectorAll('.col')[2].textContent = '-';
-            row.querySelectorAll('.col')[3].textContent = '-';
+            if (row) {
+                row.querySelectorAll('.col')[1].textContent = '-';
+                row.querySelectorAll('.col')[2].textContent = '-';
+                row.querySelectorAll('.col')[3].textContent = '-';
+            }
         }
-        $('avgSteps').textContent = '-';
-        $('avgCadence').textContent = '-';
-        $('avgMjOA').textContent = '-';
+        if ($('avgSteps')) $('avgSteps').textContent = '-';
+        if ($('avgCadence')) $('avgCadence').textContent = '-';
+        if ($('avgMjOA')) $('avgMjOA').textContent = '-';
 
         resetTestUI();
     }
@@ -824,12 +826,12 @@
         if (!isMobile) {
             statusText.textContent = '请使用手机浏览器打开此页面以获取传感器数据';
             // 禁用三个测试按钮
-            testBtn1.disabled = true;
-            testBtn2.disabled = true;
-            testBtn3.disabled = true;
-            testBtn1.style.opacity = '0.5';
-            testBtn2.style.opacity = '0.5';
-            testBtn3.style.opacity = '0.5';
+            if (testBtn1) testBtn1.disabled = true;
+            if (testBtn2) testBtn2.disabled = true;
+            if (testBtn3) testBtn3.disabled = true;
+            if (testBtn1) testBtn1.style.opacity = '0.5';
+            if (testBtn2) testBtn2.style.opacity = '0.5';
+            if (testBtn3) testBtn3.style.opacity = '0.5';
         }
     }
 
