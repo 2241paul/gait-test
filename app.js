@@ -19,13 +19,19 @@
     let waveformInterval = null;
     let currentResult = null;
     let currentRawData = [];
+    let currentTestIndex = 0; // 1, 2, 3 - 当前第几次测试
+
+    // 三次测试结果存储
+    let tripleResults = [null, null, null]; // [test1, test2, test3]
 
     // DOM 元素
     const $ = (id) => document.getElementById(id);
     const timerCircle = $('timerCircle');
     const timerDisplay = $('timerDisplay');
     const statusText = $('statusText');
-    const startBtn = $('startBtn');
+    const testBtn1 = $('testBtn1');
+    const testBtn2 = $('testBtn2');
+    const testBtn3 = $('testBtn3');
     const resetBtn = $('resetBtn');
     const controlPanel = $('controlPanel');
     const resultsCard = $('resultsCard');
@@ -39,8 +45,7 @@
 
     // 结果显示元素
     const stepsResult = $('stepsResult');
-    const cadenceResult = $('cadenceResult');
-    const stabilityResult = $('stabilityResult');
+    const balanceGradeResult = $('balanceGradeResult');
 
     // Canvas 上下文
     const ctx = waveformCanvas.getContext('2d');
@@ -325,7 +330,26 @@
         resultsCard.style.display = 'block';
         resetBtn.style.display = 'inline-block';
 
-        // 保存历史记录（通过 DataExport 模块）
+        // 保存本次结果
+        tripleResults[currentTestIndex - 1] = {
+            result: currentResult,
+            rawData: currentRawData
+        };
+
+        // 更新三次测试表格
+        updateTripleResultsTable();
+
+        // 启用下一次测试按钮
+        if (currentTestIndex < 3) {
+            $(`testBtn${currentTestIndex + 1}`).disabled = false;
+        }
+
+        // 如果三次都完成，计算平均并生成最终报告
+        if (currentTestIndex === 3 && tripleResults.every(r => r !== null)) {
+            computeAverageAndFinalize();
+        }
+
+        // 保存单次测试历史记录（通过 DataExport 模块）
         dataExport.saveRecord({
             features: currentResult.features,
             featureCount: Object.keys(currentResult.features).length,
@@ -340,6 +364,93 @@
     }
 
     // ============================================================
+    // 更新三次测试结果表格
+    // ============================================================
+    function updateTripleResultsTable() {
+        for (let i = 0; i < 3; i++) {
+            const row = $(`resultRow${i + 1}`);
+            const result = tripleResults[i];
+            if (result && result.result) {
+                const features = result.result.features;
+                const mj = result.result.mjPrediction;
+                row.querySelectorAll('.col')[1].textContent = features.step_count || '-';
+                row.querySelectorAll('.col')[2].textContent = features.step_frequency ? ((features.step_frequency * 60).toFixed(1)) : '-';
+                row.querySelectorAll('.col')[3].textContent = mj ? mj.score : '-';
+            }
+        }
+    }
+
+    // ============================================================
+    // 计算三次平均值并完成最终结果
+    // ============================================================
+    function computeAverageAndFinalize() {
+        // 计算平均值（对数值型特征）
+        const avgFeatures = {};
+        const count = 3;
+
+        // 需要平均的关键参数
+        const keysToAvg = ['step_count', 'step_frequency', 'step_time_mean', 'step_time_std', 
+                         'sway_area', 'sway_path_length', 'acc_total_std', 
+                         'sample_entropy', 'signal_quality_score'];
+
+        keysToAvg.forEach(key => {
+            let sum = 0;
+            let validCount = 0;
+            tripleResults.forEach(r => {
+                const val = r.result.features[key];
+                if (typeof val === 'number' && isFinite(val)) {
+                    sum += val;
+                    validCount++;
+                }
+            });
+            avgFeatures[key] = validCount > 0 ? sum / validCount : 0;
+        });
+
+        // 复制其他特征（使用第一次的非数值特征）
+        Object.assign(avgFeatures, tripleResults[0].result.features);
+
+        // 平均mJOA评分（四舍五入）
+        let mjSum = 0;
+        tripleResults.forEach(r => {
+            mjSum += r.result.mjPrediction ? r.result.mjPrediction.score : 0;
+        });
+        const avgMjScore = Math.round(mjSum / count);
+        const avgMjPrediction = {
+            score: avgMjScore,
+            confidence: 75,
+            description: balanceGrade[avgMjScore]
+        };
+
+        // 更新平均表格
+        $('avgSteps').textContent = avgFeatures.step_count ? avgFeatures.step_count.toFixed(1) : '-';
+        $('avgCadence').textContent = avgFeatures.step_frequency ? (avgFeatures.step_frequency * 60).toFixed(1) : '-';
+        $('avgMjOA').textContent = avgMjScore;
+
+        // 保存最终平均结果
+        currentResult.features = Object.assign({}, currentResult.features, avgFeatures);
+        currentResult.mjPrediction = avgMjPrediction;
+
+        speak('三次测试完成，结果已生成');
+    }
+
+    // 平衡等级描述映射
+    const balanceGrade = {
+        4: '正常',
+        3: '正常',
+        2: '轻度异常',
+        1: '重度异常',
+        0: '重度异常'
+    };
+
+    const balanceGradeClass = {
+        4: 'grade-excellent',
+        3: 'grade-excellent',
+        2: 'grade-good',
+        1: 'grade-poor',
+        0: 'grade-poor'
+    };
+
+    // ============================================================
     // 显示结果
     // ============================================================
     function displayResults(result) {
@@ -347,19 +458,9 @@
         const gaitSpecific = result.categories?.gaitSpecific || {};
 
         stepsResult.textContent = gaitSpecific.step_count || 0;
-        cadenceResult.textContent = ((gaitSpecific.step_frequency || 0) * 60).toFixed(1);
-        stabilityResult.textContent = result.mjPrediction?.score || 0;
-
-        // 平衡指数颜色
-        stabilityResult.className = 'result-value';
-        const stabilityScore = result.mjPrediction?.score || 0;
-        if (stabilityScore >= 3) {
-            stabilityResult.classList.add('grade-excellent');
-        } else if (stabilityScore >= 2) {
-            stabilityResult.classList.add('grade-good');
-        } else {
-            stabilityResult.classList.add('grade-poor');
-        }
+        const score = result.mjPrediction?.score || 0;
+        balanceGradeResult.textContent = balanceGrade[score] || '-';
+        balanceGradeResult.className = 'result-value ' + balanceGradeClass[score];
 
         // 隐藏详细参数
         detailParams.style.display = 'none';
@@ -624,7 +725,7 @@
     }
 
     // ============================================================
-    // 重置测试
+    // 重置单次测试（用于重新测试当前次）
     // ============================================================
     function resetTestUI() {
         isTesting = false;
@@ -646,13 +747,38 @@
         timerCircle.className = 'timer-circle';
         timerDisplay.textContent = '10';
         timerDisplay.classList.remove('timer-counting');
-        statusText.textContent = '点击下方按钮开始测试';
-        startBtn.style.display = 'inline-block';
+        statusText.textContent = `准备测试第 ${currentTestIndex} 次`;
+
+        if (currentTestIndex === 1) testBtn1.style.display = 'inline-block';
         resetBtn.style.display = 'none';
         resultsCard.style.display = 'none';
 
         currentResult = null;
         currentRawData = [];
+    }
+
+    // ============================================================
+    // 重置所有三次测试
+    // ============================================================
+    function resetAllTests() {
+        tripleResults = [null, null, null];
+        currentTestIndex = 1;
+        testBtn1.disabled = false;
+        testBtn2.disabled = true;
+        testBtn3.disabled = true;
+
+        // 清空表格
+        for (let i = 0; i < 3; i++) {
+            const row = $(`resultRow${i + 1}`);
+            row.querySelectorAll('.col')[1].textContent = '-';
+            row.querySelectorAll('.col')[2].textContent = '-';
+            row.querySelectorAll('.col')[3].textContent = '-';
+        }
+        $('avgSteps').textContent = '-';
+        $('avgCadence').textContent = '-';
+        $('avgMjOA').textContent = '-';
+
+        resetTestUI();
     }
 
     function resetTest() {
@@ -662,7 +788,8 @@
     // ============================================================
     // 开始测试
     // ============================================================
-    async function startTest() {
+    async function startTest(testIndex = 1) {
+        currentTestIndex = testIndex;
         // 检查支持
         const support = sensorManager.checkSensorSupport();
         if (!support.accelerometer && !support.deviceMotion) {
@@ -679,7 +806,6 @@
 
         // 重置状态
         resetTestUI();
-        startBtn.style.display = 'none';
 
         // 开始3秒准备倒计时
         startPreparation();
@@ -727,6 +853,7 @@
     window.app = {
         startTest,
         resetTest,
+        resetAllTests,
         editSteps,
         toggleDetailParams,
         toggleParamGroup,

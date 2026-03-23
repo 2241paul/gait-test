@@ -70,15 +70,22 @@
                 </div>
             </div>
 
-            <!-- 控制面板 -->
+            <!-- 三次测试控制面板 -->
             <div class="control-panel" id="controlPanel">
-                <button class="btn-primary" id="startBtn" onclick="app.startTest()">开始测试</button>
-                <button class="btn-secondary" id="resetBtn" onclick="app.resetTest()" style="display: none;">重新测试</button>
+                <div class="triple-test-buttons">
+                    <button class="btn-test btn-test-1" id="testBtn1" onclick="app.startTest(1)">测第一次</button>
+                    <button class="btn-test btn-test-2" id="testBtn2" onclick="app.startTest(2)" disabled>测第二次</button>
+                    <button class="btn-test btn-test-3" id="testBtn3" onclick="app.startTest(3)" disabled>测第三次</button>
+                </div>
+                <div class="triple-test-info" id="tripleTestInfo">
+                    请依次完成三次测试，完成后自动计算平均值生成报告
+                </div>
+                <button class="btn-secondary" id="resetBtn" onclick="app.resetAllTests()" style="display: none;">重新开始</button>
             </div>
 
             <!-- 结果报告区 -->
             <div class="results-card" id="resultsCard" style="display: none;">
-                <h2>测试结果</h2>
+                <h2>当前测试结果</h2>
                 <div class="result-summary">
                     <div class="result-item">
                         <span class="result-label">总步数</span>
@@ -89,14 +96,9 @@
                         <span class="result-unit">步</span>
                     </div>
                     <div class="result-item">
-                        <span class="result-label">步频</span>
-                        <span class="result-value" id="cadenceResult">-</span>
-                        <span class="result-unit">步/分钟</span>
-                    </div>
-                    <div class="result-item">
-                        <span class="result-label">平衡指数</span>
-                        <span class="result-value" id="stabilityResult">-</span>
-                        <span class="result-unit">/ 100</span>
+                        <span class="result-label">平衡功能</span>
+                        <span class="result-value" id="balanceGradeResult">-</span>
+                        <span class="result-unit"></span>
                     </div>
                 </div>
 
@@ -156,6 +158,40 @@
                     </div>
                 </div>
 
+                <!-- 三次测试结果表格 -->
+                <div class="triple-results-table" id="tripleResultsTable">
+                    <div class="table-header">
+                        <div class="col">测试</div>
+                        <div class="col">步数</div>
+                        <div class="col">步频(步/分)</div>
+                        <div class="col">mJOA评分</div>
+                    </div>
+                    <div class="table-row" id="resultRow1">
+                        <div class="col">1</div>
+                        <div class="col">-</div>
+                        <div class="col">-</div>
+                        <div class="col">-</div>
+                    </div>
+                    <div class="table-row" id="resultRow2">
+                        <div class="col">2</div>
+                        <div class="col">-</div>
+                        <div class="col">-</div>
+                        <div class="col">-</div>
+                    </div>
+                    <div class="table-row" id="resultRow3">
+                        <div class="col">3</div>
+                        <div class="col">-</div>
+                        <div class="col">-</div>
+                        <div class="col">-</div>
+                    </div>
+                    <div class="table-row table-row-average">
+                        <div class="col"><strong>平均值</strong></div>
+                        <div class="col" id="avgSteps">-</div>
+                        <div class="col" id="avgCadence">-</div>
+                        <div class="col" id="avgMjOA">-</div>
+                    </div>
+                </div>
+
                 <!-- 导出按钮组 -->
                 <div class="export-group">
                     <button class="btn-export" onclick="app.exportCSV()">导出CSV</button>
@@ -179,13 +215,17 @@
             <div class="info-card">
                 <h3>测试说明</h3>
                 <ul>
-                    <li><strong>右手握持手机，屏幕朝向自己</strong></li>
-                    <li><strong>足跟贴足尖，沿直线缓慢行走</strong></li>
+                    <li><strong>✋ 握持方式：右手握持手机，双臂自然外展张开，手掌向前，<u>屏幕朝向行走方向</u></strong></li>
+                    <li><strong>🚶 行走方式：足跟贴紧足尖，沿直线缓慢行走</strong></li>
                     <li><strong>保持手机平稳，避免主动摆臂</strong></li>
                     <li>需要至少5米直线空间</li>
-                    <li>测试时间：准备3秒 + 测试10秒</li>
-                    <li>测试完成后自动分析结果</li>
+                    <li>测试时间：准备3秒 + 测试10秒，共测试三次</li>
+                    <li>测试完成后自动计算三次平均值生成报告</li>
                 </ul>
+                <div class="highlight-note danger-note">
+                    <strong>⚠️ 安全提示：</strong>本试验有跌倒风险，<strong>必须在陪同人员看护下进行</strong>，
+                    避免单独自行测试。可由陪同人员观察手机倒计时给出起止指令。
+                </div>
                 <div class="highlight-note">
                     <strong>临床原理：</strong>颈脊髓病压迫脊髓后索，导致本体感觉障碍，平衡功能受损。
                     踵趾步态放大平衡异常，手握手机保持稳定时，平衡受损者会产生额外晃动，

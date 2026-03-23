@@ -495,22 +495,23 @@ class SensorManager {
         // 根据屏幕方向和设备类型估算坐标系映射
         const isPortrait = orientation.includes('portrait');
         
-        // 标准手机竖握：
+        // 标准手机竖握，屏幕朝前（朝向行走方向）：
         //   设备X -> 物理：左右(设备左右)，映射到ENu的Y(左右)
-        //   设备Y -> 物理：上下(设备上下)，映射到ENu的Z(上下) 或 -Z
-        //   设备Z -> 物理：前后(屏幕朝向)，映射到ENu的X(前后)
+        //   设备Y -> 物理：上下(设备上下)，映射到ENu的Z(上下) 
+        //   设备Z -> 物理：前后(屏幕朝向) -> 用户握持屏幕向前，所以Z正方向 = ENu X正方向（前后行走方向）
+        //   重力方向：自然下垂握持，重力沿-Y方向，所以 ENu_Z = -设备Y（向上为正）
         if (isPortrait) {
-            // 竖屏：设备XYZ -> ENu的 YZX（取反Y使朝上为正）
+            // 竖屏向前走：屏幕朝前，设备Z -> ENu X(向前)，设备X -> ENu Y(左右)，设备-Y -> ENu Z(向上)
             this._orientationMatrix = [
-                0, 0, 1,  // ENu_X = 设备Z（前后）
-                1, 0, 0,  // ENu_Y = 设备X（左右）
-                0, -1, 0  // ENu_Z = -设备Y（向上为正）
+                0, 0, 1,  // ENu_X = 设备Z（屏幕向前 -> 行走方向）
+                1, 0, 0,  // ENu_Y = 设备X（设备左右 -> 物理左右）
+                0, -1, 0  // ENu_Z = -设备Y（重力向下 -> 向上为正）
             ];
         } else {
-            // 横屏
+            // 横屏向前走
             this._orientationMatrix = [
                 0, 0, 1,  // ENu_X = 设备Z（前后）
-                0, 1, 0,  // ENu_Y = 设备Y
+                0, 1, 0,  // ENu_Y = 设备Y（左右）
                 -1, 0, 0  // ENu_Z = -设备X
             ];
         }
@@ -560,20 +561,22 @@ class SensorManager {
         // Android也类似
         
         // 通用构建：根据重力方向推断
-        // 重力沿Y轴（手机竖直握持，最常见）
+        // 重力沿Y轴（手机竖直握持，屏幕向前，最常见）
+        // 用户握持：手机竖直，屏幕朝向行走方向，重力沿-Y方向
         if (upAxis === 1) {
             // 设备Y轴≈重力方向（上下）
-            // ENu_X = 设备Y(前后), ENu_Y = 设备X(左右), ENu_Z = 重力反方向(向上)
+            // ENu_X = 设备Z(屏幕向前 -> 行走方向
+            // ENu_Y = 设备X(左右)
+            // ENu_Z = 重力反方向(向上) = -设备Y
             this._orientationMatrix = [
-                upSign, 0, 0,    // ENu_X
-                0, 1, 0,        // ENu_Y = 设备X(左右)
-                0, 0, -upSign   // ENu_Z = 重力反方向
+                0, upSign, 0,    // ENu_X = 设备Z（屏幕朝向=行走方向，与X轴）
+                1, 0, 0,        // ENu_Y = 设备X（左右）
+                0, 0, -upSign   // ENu_Z = -upSign * 设备Y（重力方向反方向=向上）
             ];
         }
         // 重力沿Z轴（手机平放）
         else if (upAxis === 2) {
             // 设备Z轴≈重力方向
-            // ENu_X = 设备X(前后), ENu_Y = 设备Y(左右), ENu_Z = 重力反方向
             this._orientationMatrix = [
                 1, 0, 0,        // ENu_X
                 0, 1, 0,        // ENu_Y

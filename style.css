@@ -206,9 +206,66 @@ main {
 /* ===== 控制面板 ===== */
 .control-panel {
     display: flex;
+    flex-direction: column;
     justify-content: center;
-    gap: 16px;
+    gap: 12px;
     margin-top: 8px;
+}
+
+.triple-test-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.btn-test {
+    flex: 1;
+    padding: 14px 12px;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    border: 2px solid;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-test:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-test-1 {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-test-2 {
+    border-color: var(--accent-color);
+    background: white;
+    color: var(--accent-color);
+}
+
+.btn-test-2:enabled {
+    background: var(--accent-color);
+    color: white;
+}
+
+.btn-test-3 {
+    border-color: var(--secondary-color);
+    background: white;
+    color: var(--secondary-color);
+}
+
+.btn-test-3:enabled {
+    background: var(--secondary-color);
+    color: white;
+}
+
+.triple-test-info {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
 }
 
 .btn-primary {
@@ -481,6 +538,37 @@ main {
     flex-shrink: 0;
 }
 
+/* ===== 三次测试结果表格 ===== */
+.triple-results-table {
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.triple-results-table .table-header {
+    display: flex;
+    background: #f3f4f6;
+    font-weight: 600;
+}
+
+.triple-results-table .table-row {
+    display: flex;
+    border-top: 1px solid var(--border-color);
+}
+
+.triple-results-table .col {
+    flex: 1;
+    padding: 12px 10px;
+    text-align: center;
+    font-size: 0.9375rem;
+}
+
+.triple-results-table .table-row-average {
+    background: #f0f4ff;
+    font-weight: 600;
+}
+
 /* ===== 导出按钮组 ===== */
 .export-group {
     display: flex;
@@ -636,6 +724,12 @@ main {
     line-height: 1.6;
 }
 
+.highlight-note.danger-note {
+    background: #fee2e2;
+    border-left: 4px solid var(--danger-color);
+    color: #991b1b;
+}
+
 /* 医学伦理声明 */
 .ethics-notice {
     margin-top: 14px;
@@ -662,12 +756,12 @@ main {
 .patient-info-form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
 }
 
 .form-row {
     display: flex;
-    gap: 16px;
+    gap: 20px;
 }
 
 .form-group {
@@ -682,17 +776,17 @@ main {
 }
 
 .form-group label {
-    font-size: 0.875rem;
+    font-size: 1.0625rem;
     color: var(--text-secondary);
     font-weight: 500;
 }
 
 .form-group input,
 .form-group select {
-    padding: 10px 12px;
+    padding: 14px 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    font-size: 1rem;
+    font-size: 1.125rem;
     color: var(--text-primary);
     background: white;
     transition: border-color 0.2s;
