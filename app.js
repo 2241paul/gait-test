@@ -24,38 +24,11 @@
     // 三次测试结果存储
     let tripleResults = [null, null, null]; // [test1, test2, test3]
 
-    // DOM 元素 - will be initialized after DOM load
+    // 简单获取DOM：每次使用都重新获取，永远不会null
     const $ = (id) => document.getElementById(id);
-    let timerCircle, timerDisplay, statusText;
-    let testBtn1, testBtn2, testBtn3, resetBtn;
-    let resultsCard, waveformCard, waveformCanvas, historyCard, historyList;
-    let detailParams, detailToggleText, detailToggleArrow;
-    let stepsResult, balanceGradeResult;
-    let ctx;
+
     const WAVEFORM_WINDOW = 2000; // 显示最近2秒数据
     const WAVEFORM_UPDATE_INTERVAL = 50; // 50ms更新一次
-
-    // 延迟初始化DOM元素，等待DOM加载完成
-    function initDOM() {
-        timerCircle = $('timerCircle');
-        timerDisplay = $('timerDisplay');
-        statusText = $('statusText');
-        testBtn1 = $('testBtn1');
-        testBtn2 = $('testBtn2');
-        testBtn3 = $('testBtn3');
-        resetBtn = $('resetBtn');
-        resultsCard = $('resultsCard');
-        waveformCard = $('waveformCard');
-        waveformCanvas = $('waveformCanvas');
-        historyCard = $('historyCard');
-        historyList = $('historyList');
-        detailParams = $('detailParams');
-        detailToggleText = $('detailToggleText');
-        detailToggleArrow = $('detailToggleArrow');
-        stepsResult = $('stepsResult');
-        balanceGradeResult = $('balanceGradeResult');
-        ctx = waveformCanvas.getContext('2d');
-    }
 
     // ============================================================
     // 语音合成（Web Speech API）
@@ -115,7 +88,10 @@
     // ============================================================
     function initCanvas() {
         const dpr = window.devicePixelRatio || 1;
+        const waveformCanvas = $('waveformCanvas');
+        if (!waveformCanvas) return;
         const rect = waveformCanvas.getBoundingClientRect();
+        const ctx = waveformCanvas.getContext('2d');
         waveformCanvas.width = rect.width * dpr;
         waveformCanvas.height = rect.height * dpr;
         ctx.scale(dpr, dpr);
@@ -123,6 +99,10 @@
 
     function drawWaveform() {
         if (!sensorManager || !sensorManager.isRunning) return;
+
+        const waveformCanvas = $('waveformCanvas');
+        if (!waveformCanvas) return;
+        const ctx = waveformCanvas.getContext('2d');
 
         const data = sensorManager.getData();
         const now = Date.now();
@@ -187,7 +167,8 @@
 
     function startWaveform() {
         initCanvas();
-        waveformCard.style.display = 'block';
+        const waveformCard = $('waveformCard');
+        if (waveformCard) waveformCard.style.display = 'block';
         waveformInterval = setInterval(drawWaveform, WAVEFORM_UPDATE_INTERVAL);
     }
 
@@ -196,7 +177,8 @@
             clearInterval(waveformInterval);
             waveformInterval = null;
         }
-        waveformCard.style.display = 'none';
+        const waveformCard = $('waveformCard');
+        if (waveformCard) waveformCard.style.display = 'none';
     }
 
     // ============================================================
@@ -206,13 +188,18 @@
         isPreparing = true;
         let count = 3;
 
-        timerCircle.className = 'timer-circle preparing';
-        timerDisplay.textContent = count;
-        timerDisplay.classList.add('timer-counting');
-        statusText.textContent = '准备...';
-        startBtn.style.display = 'none';
-        resetBtn.style.display = 'none';
-        resultsCard.style.display = 'none';
+        const timerCircle = $('timerCircle');
+        const timerDisplay = $('timerDisplay');
+        const statusText = $('statusText');
+        const resetBtn = $('resetBtn');
+        const resultsCard = $('resultsCard');
+
+        if (timerCircle) timerCircle.className = 'timer-circle preparing';
+        if (timerDisplay) timerDisplay.textContent = count;
+        if (timerDisplay) timerDisplay.classList.add('timer-counting');
+        if (statusText) statusText.textContent = '准备...';
+        if (resetBtn) resetBtn.style.display = 'none';
+        if (resultsCard) resultsCard.style.display = 'none';
 
         // 语音提示：三
         speak('三');
@@ -220,10 +207,13 @@
         prepareTimer = setInterval(() => {
             count--;
             if (count > 0) {
-                timerDisplay.textContent = count;
-                timerDisplay.classList.remove('timer-counting');
-                void timerDisplay.offsetWidth; // 触发重绘
-                timerDisplay.classList.add('timer-counting');
+                const timerDisplay = $('timerDisplay');
+                if (timerDisplay) {
+                    timerDisplay.textContent = count;
+                    timerDisplay.classList.remove('timer-counting');
+                    void timerDisplay.offsetWidth; // 触发重绘
+                    timerDisplay.classList.add('timer-counting');
+                }
                 // 语音
                 const nums = { 2: '二', 1: '一' };
                 speak(nums[count]);
@@ -462,14 +452,21 @@
         const params = result.features || result.params;
         const gaitSpecific = result.categories?.gaitSpecific || {};
 
-        stepsResult.textContent = gaitSpecific.step_count || 0;
+        const stepsResult = $('stepsResult');
+        const balanceGradeResult = $('balanceGradeResult');
+        const detailParams = $('detailParams');
+        const detailToggleArrow = $('detailToggleArrow');
+
+        if (stepsResult) stepsResult.textContent = gaitSpecific.step_count || 0;
         const score = result.mjPrediction?.score || 0;
-        balanceGradeResult.textContent = balanceGrade[score] || '-';
-        balanceGradeResult.className = 'result-value ' + balanceGradeClass[score];
+        if (balanceGradeResult) {
+            balanceGradeResult.textContent = balanceGrade[score] || '-';
+            balanceGradeResult.className = 'result-value ' + balanceGradeClass[score];
+        }
 
         // 隐藏详细参数
-        detailParams.style.display = 'none';
-        detailToggleArrow.classList.remove('expanded');
+        if (detailParams) detailParams.style.display = 'none';
+        if (detailToggleArrow) detailToggleArrow.classList.remove('expanded');
 
         // 填充详细参数
         fillDetailParams(result);
@@ -533,9 +530,13 @@
     // 切换详细参数
     // ============================================================
     function toggleDetailParams() {
+        const detailParams = $('detailParams');
+        const detailToggleArrow = $('detailToggleArrow');
+        if (!detailParams) return;
+
         const isHidden = detailParams.style.display === 'none';
         detailParams.style.display = isHidden ? 'block' : 'none';
-        detailToggleArrow.classList.toggle('expanded', isHidden);
+        if (detailToggleArrow) detailToggleArrow.classList.toggle('expanded', isHidden);
     }
 
     // 切换参数分组
@@ -544,7 +545,7 @@
         const arrow = header.querySelector('.param-group-arrow');
         const isExpanded = content.classList.contains('expanded');
         content.classList.toggle('expanded', !isExpanded);
-        arrow.classList.toggle('expanded', !isExpanded);
+        if (arrow) arrow.classList.toggle('expanded', !isExpanded);
     }
 
     // ============================================================
@@ -749,14 +750,23 @@
         sensorManager.clearData();
         stopWaveform();
 
-        timerCircle.className = 'timer-circle';
-        timerDisplay.textContent = '10';
-        timerDisplay.classList.remove('timer-counting');
-        statusText.textContent = `准备测试第 ${currentTestIndex} 次`;
+        const timerCircle = $('timerCircle');
+        const timerDisplay = $('timerDisplay');
+        const statusText = $('statusText');
+        const testBtn1 = $('testBtn1');
+        const testBtn2 = $('testBtn2');
+        const testBtn3 = $('testBtn3');
+        const resetBtn = $('resetBtn');
+        const resultsCard = $('resultsCard');
 
-        if (currentTestIndex === 1) testBtn1.style.display = 'inline-block';
-        resetBtn.style.display = 'none';
-        resultsCard.style.display = 'none';
+        if (timerCircle) timerCircle.className = 'timer-circle';
+        if (timerDisplay) timerDisplay.textContent = '10';
+        if (timerDisplay) timerDisplay.classList.remove('timer-counting');
+        if (statusText) statusText.textContent = `准备测试第 ${currentTestIndex} 次`;
+
+        if (currentTestIndex === 1 && testBtn1) testBtn1.style.display = 'inline-block';
+        if (resetBtn) resetBtn.style.display = 'none';
+        if (resultsCard) resultsCard.style.display = 'none';
 
         currentResult = null;
         currentRawData = [];
@@ -824,8 +834,11 @@
     function checkMobile() {
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (!isMobile) {
-            statusText.textContent = '请使用手机浏览器打开此页面以获取传感器数据';
+            $('statusText').textContent = '请使用手机浏览器打开此页面以获取传感器数据';
             // 禁用三个测试按钮
+            const testBtn1 = $('testBtn1');
+            const testBtn2 = $('testBtn2');
+            const testBtn3 = $('testBtn3');
             if (testBtn1) testBtn1.disabled = true;
             if (testBtn2) testBtn2.disabled = true;
             if (testBtn3) testBtn3.disabled = true;
@@ -855,7 +868,6 @@
     // 初始化
     // ============================================================
     window.addEventListener('load', () => {
-        initDOM();
         checkMobile();
         renderHistory();
     });
