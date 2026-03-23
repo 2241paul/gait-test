@@ -179,7 +179,8 @@ class GaitAnalyzer {
 
         const mean = this._mean(filtered);
         const std = this._std(filtered);
-        const threshold = mean + 0.6 * std;
+        // V1.3调整：提高阈值降低敏感性，减少误检
+        const threshold = mean + 0.7 * std;
 
         for (let i = windowSize; i < filtered.length - windowSize; i++) {
             let isPeak = true;
@@ -201,9 +202,8 @@ class GaitAnalyzer {
 
                 // 陀螺仪能量阈值：取整个信号的25百分位数作为基线
                 const gyroThreshold = this._percentile(gyroEnvelope, 25);
-                // 如果陀螺仪能量极低（低于基线），说明这可能是噪声误检
-                // 但不能完全排除（有些患者步态旋转确实很弱），所以只在能量为0时才排除
-                if (gyroEnergy < gyroThreshold * 0.3 && gyroThreshold > 0.001) {
+                // V1.3调整：提高陀螺仪验证门槛进一步减少误检
+                if (gyroEnergy < gyroThreshold * 0.4 && gyroThreshold > 0.001) {
                     continue; // 跳过此候选步
                 }
             }
