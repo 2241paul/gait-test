@@ -412,6 +412,10 @@ main {
     color: var(--accent-color) !important;
 }
 
+.grade-moderate {
+    color: #F97316 !important;  /* 橙色，介于黄和红之间 */
+}
+
 .grade-poor {
     color: var(--danger-color) !important;
 }

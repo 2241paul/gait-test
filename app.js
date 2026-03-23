@@ -331,9 +331,11 @@
         if (resultsCard) resultsCard.style.display = 'block';
         if (resetBtn)    resetBtn.style.display = 'inline-block';
 
-        // 保存本次结果
+        // 保存本次结果（features做快照，防止后续平均值计算覆盖原始数据）
         tripleResults[currentTestIndex - 1] = {
-            result: currentResult,
+            result: Object.assign({}, currentResult, {
+                features: Object.assign({}, currentResult.features)
+            }),
             rawData: currentRawData
         };
 
@@ -422,14 +424,16 @@
     }
 
     // 平衡等级描述映射 - 基于sway_area (m²单位，换算cm²后显示)
+    // 阈值：正常<500cm²，轻度500-1000cm²，中度1000-2000cm²，重度>2000cm²
     function getBalanceGrade(swayAreaM2) {
-        if (swayAreaM2 < 0.00005) return 'normal';   // < 0.5 cm²
-        if (swayAreaM2 < 0.0005)  return 'mild';     // 0.5 ~ 5 cm²
-        return 'severe';                              // > 5 cm²
+        if (swayAreaM2 < 0.05)  return 'normal';    // < 500 cm²
+        if (swayAreaM2 < 0.10)  return 'mild';      // 500 ~ 1000 cm²
+        if (swayAreaM2 < 0.20)  return 'moderate';  // 1000 ~ 2000 cm²
+        return 'severe';                             // > 2000 cm²
     }
 
-    const balanceGradeText  = { normal: '正常', mild: '轻度异常', severe: '重度异常' };
-    const balanceGradeClass = { normal: 'grade-excellent', mild: 'grade-good', severe: 'grade-poor' };
+    const balanceGradeText  = { normal: '正常', mild: '轻度异常', moderate: '中度异常', severe: '重度异常' };
+    const balanceGradeClass = { normal: 'grade-excellent', mild: 'grade-good', moderate: 'grade-moderate', severe: 'grade-poor' };
 
     // ============================================================
     // 显示结果

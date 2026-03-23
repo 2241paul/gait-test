@@ -444,15 +444,43 @@ class GaitAnalyzer {
             return {
                 sway_path_length: 0, sway_velocity_mean: 0, sway_velocity_std: 0,
                 sway_velocity_max: 0, sway_area: 0, sway_ellipse_area: 0,
-                sway_ellipse_major: 0, sway_ellipse_minor: 0, sway_ellipse_orientation: 0
+                sway_ellipse_major: 0, sway_ellipse_minor: 0, sway_ellipse_orientation: 0,
+                acc_sway_rms_ap: 0, acc_sway_rms_ml: 0, acc_sway_rms_vert: 0, acc_sway_rms_3d: 0
             };
         }
 
-        // 用XY平面的累积位移作为sway
-        // 积分加速度得到速度（简化：低通滤波后的加速度积分）
+        /* ---------------------------------------------------------------
+         * 坐标系（屏幕朝前进方向握持，ENu归一化后）：
+         *   x = 前后(AP, Anterior-Posterior)
+         *   y = 左右(ML, Medio-Lateral)
+         *   z = 上下(Vertical)
+         *
+         * 晃动面积：用 AP(x) × ML(y) 二维平面位移轨迹计算
+         * 垂直方向(z)不参与面积计算（属于正常步态律动），
+         * 但单独提供 acc_sway_rms_vert 以备非线性分析使用。
+         * --------------------------------------------------------------- */
+
+        // ---- 加速度 RMS（反映各方向晃动烈度）----
+        // 去除重力偏置后的动态加速度（低通截止0.8Hz去直流）
+        const apRaw  = accel.map(d => d.x);  // 前后
+        const mlRaw  = accel.map(d => d.y);  // 左右
+        const vertRaw= accel.map(d => d.z);  // 上下
+
+        // 去均值（消除重力/持续偏置）
+        const apDyn   = this._removeMean(apRaw);
+        const mlDyn   = this._removeMean(mlRaw);
+        const vertDyn = this._removeMean(vertRaw);
+
+        const rmsAP   = this._rms(apDyn);
+        const rmsML   = this._rms(mlDyn);
+        const rmsVert = this._rms(vertDyn);
+        // 三维综合 RMS（三方向均方根合成）
+        const rms3D   = Math.sqrt((rmsAP * rmsAP + rmsML * rmsML + rmsVert * rmsVert) / 3);
+
+        // ---- 位移轨迹（AP × ML 平面）----
         const dt = 1 / this.targetSampleRate;
-        const mlAcc = this._lowPassFilter(accel.map(d => d.y), 0.8);
-        const apAcc = this._lowPassFilter(accel.map(d => d.x), 0.8);
+        const mlAcc = this._lowPassFilter(mlRaw, 0.8);
+        const apAcc = this._lowPassFilter(apRaw, 0.8);
 
         let vx = 0, vy = 0;
         let pathLength = 0;
@@ -482,33 +510,50 @@ class GaitAnalyzer {
             prevY = y;
         }
 
-        // 椭圆拟合（简化：PCA方法）
+        // ---- 椭圆拟合（PCA，稳健）----
         const ellipse = this._fitEllipse(positions);
 
-        // Sway area（shoelace公式计算多边形面积）
-        let area = 0;
+        // ---- 面积：优先用椭圆面积（更稳健），同时保留 shoelace 供参考 ----
+        // shoelace面积（原始算法，对开放轨迹偏差较大）
+        let shoelaceArea = 0;
         if (positions.length > 2) {
             for (let i = 0; i < positions.length; i++) {
                 const j = (i + 1) % positions.length;
-                area += positions[i].x * positions[j].y;
-                area -= positions[j].x * positions[i].y;
+                shoelaceArea += positions[i].x * positions[j].y;
+                shoelaceArea -= positions[j].x * positions[i].y;
             }
-            area = Math.abs(area) / 2;
+            shoelaceArea = Math.abs(shoelaceArea) / 2;
         }
+
+        // 主 sway_area 使用椭圆面积（95%置信椭圆，更接近临床定义）
+        const swayArea = ellipse.area;
 
         const velArr = velocities.length > 0 ? velocities : [0];
 
         return {
-            sway_path_length: this._round(pathLength, 4),
-            sway_velocity_mean: this._round(this._mean(velArr), 4),
-            sway_velocity_std: this._round(this._std(velArr), 4),
-            sway_velocity_max: this._round(Math.max(...velArr), 4),
-            sway_area: this._round(area, 4),
-            sway_ellipse_area: this._round(ellipse.area, 4),
-            sway_ellipse_major: this._round(ellipse.major, 4),
-            sway_ellipse_minor: this._round(ellipse.minor, 4),
-            sway_ellipse_orientation: this._round(ellipse.orientation, 2)
+            sway_path_length:        this._round(pathLength, 4),
+            sway_velocity_mean:      this._round(this._mean(velArr), 4),
+            sway_velocity_std:       this._round(this._std(velArr), 4),
+            sway_velocity_max:       this._round(Math.max(...velArr), 4),
+            sway_area:               this._round(swayArea, 6),        // 主指标：椭圆面积(m²)
+            sway_area_shoelace:      this._round(shoelaceArea, 6),    // 参考：shoelace面积
+            sway_ellipse_area:       this._round(ellipse.area, 6),
+            sway_ellipse_major:      this._round(ellipse.major, 4),
+            sway_ellipse_minor:      this._round(ellipse.minor, 4),
+            sway_ellipse_orientation:this._round(ellipse.orientation, 2),
+            // 三方向动态加速度 RMS（反映晃动幅度，不受姿势偏置影响）
+            acc_sway_rms_ap:         this._round(rmsAP,   4),   // 前后
+            acc_sway_rms_ml:         this._round(rmsML,   4),   // 左右
+            acc_sway_rms_vert:       this._round(rmsVert, 4),   // 上下
+            acc_sway_rms_3d:         this._round(rms3D,   4)    // 综合三维
         };
+    }
+
+    /** 去均值（去除直流偏置） */
+    _removeMean(signal) {
+        if (!signal || signal.length === 0) return [];
+        const mean = this._mean(signal);
+        return signal.map(v => v - mean);
     }
 
     _computeJerk(accel) {
