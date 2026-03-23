@@ -245,8 +245,13 @@
         // 语音提示
         speak('请开始踵趾行走，保持手机平稳');
 
-        // 启动传感器
-        sensorManager.startSensors();
+        // 启动传感器，检查是否成功
+        const started = sensorManager.startSensors();
+        if (!started) {
+            alert('传感器启动失败，请确保您使用的是现代手机浏览器并授予传感器权限');
+            resetTestUI();
+            return;
+        }
 
         // 启动波形
         startWaveform();

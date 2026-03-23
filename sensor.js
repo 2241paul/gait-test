@@ -298,12 +298,27 @@ class SensorManager {
         }
         
         // 缓存线性加速度
+        // 如果device不提供acceleration（线性加速度），我们用accelerationIncludingGravity减去重力近似
         const acc = event.acceleration;
+        let haveAcc = false;
         if (acc && (acc.x !== null || acc.y !== null || acc.z !== null)) {
+            // 有线性加速度，直接用
             this._dmAccelBuffer.push({
                 x: acc.x || 0,
                 y: acc.y || 0,
                 z: acc.z || 0,
+                t: now
+            });
+            haveAcc = true;
+        } 
+        // 没有线性加速度，用accelerationIncludingGravity近似
+        if (!haveAcc && accG) {
+            // 近似：假设重力是常量，后续平均会抵消，这里直接使用
+            // 我们保留原始数据，坐标系变换后数据仍然可用
+            this._dmAccelBuffer.push({
+                x: accG.x || 0,
+                y: accG.y || 0,
+                z: accG.z || 0,
                 t: now
             });
         }
@@ -315,6 +330,13 @@ class SensorManager {
                 x: rot.beta || 0,   // beta = 前后倾斜
                 y: rot.gamma || 0,  // gamma = 左右倾斜
                 z: rot.alpha || 0,  // alpha = 偏航
+                t: now
+            });
+        }
+        // 如果陀螺仪数据不存在，仍然填充零数据保证计数
+        else {
+            this._dmGyroBuffer.push({
+                x: 0, y: 0, z: 0,
                 t: now
             });
         }
@@ -354,12 +376,24 @@ class SensorManager {
      * 线性插值并在目标时间点输出数据
      */
     _interpolateAndPush(buffer, now, t, type) {
-        if (buffer.length < 2) return;
+        if (buffer.length === 0) return;
+        
+        // 如果只有一个点，直接使用它（不需要插值）
+        if (buffer.length === 1) {
+            const p = buffer[0];
+            this._pushDataPoint(type, p.x, p.y, p.z);
+            return;
+        }
         
         // 找到最近的两个点进行插值
         let idx = buffer.length - 1;
         while (idx > 0 && buffer[idx].t > now) idx--;
-        if (idx >= buffer.length - 1) return;
+        if (idx >= buffer.length - 1) {
+            // 所有点都在now之后，用最后一个点
+            const p = buffer[buffer.length - 1];
+            this._pushDataPoint(type, p.x, p.y, p.z);
+            return;
+        }
         
         const p0 = buffer[idx];
         const p1 = buffer[idx + 1];
@@ -371,6 +405,9 @@ class SensorManager {
             const y = p0.y + alpha * (p1.y - p0.y);
             const z = p0.z + alpha * (p1.z - p0.z);
             this._pushDataPoint(type, x, y, z);
+        } else {
+            // 时间相同，直接用第一个点
+            this._pushDataPoint(type, p0.x, p0.y, p0.z);
         }
     }
 
@@ -444,9 +481,16 @@ class SensorManager {
         // 假设手机静止时加速度均值约为重力方向
         // 行走时各轴均值趋于0，但方差不同
         // 简化策略：用screen orientation API辅助
-        const orientation = screen.orientation ? screen.orientation.type : 
-                          (window.orientation !== undefined ? 
-                           (Math.abs(window.orientation) === 90 ? 'landscape' : 'portrait') : 'portrait');
+        let orientation = 'portrait';
+        try {
+            if (typeof screen !== 'undefined' && screen.orientation && screen.orientation.type) {
+                orientation = screen.orientation.type;
+            } else if (typeof window !== 'undefined' && typeof window.orientation !== 'undefined') {
+                orientation = Math.abs(window.orientation) === 90 ? 'landscape' : 'portrait';
+            }
+        } catch (e) {
+            orientation = 'portrait';
+        }
         
         // 根据屏幕方向和设备类型估算坐标系映射
         const isPortrait = orientation.includes('portrait');
