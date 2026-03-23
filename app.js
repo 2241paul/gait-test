@@ -424,12 +424,12 @@
     }
 
     // 平衡等级描述映射 - 基于sway_area (m²单位，换算cm²后显示)
-    // 阈值：正常<500cm²，轻度500-1000cm²，中度1000-2000cm²，重度>2000cm²
+    // 阈值：正常<500cm²，轻度500-2000cm²，中度2000-10000cm²，重度>10000cm²
     function getBalanceGrade(swayAreaM2) {
         if (swayAreaM2 < 0.05)  return 'normal';    // < 500 cm²
-        if (swayAreaM2 < 0.10)  return 'mild';      // 500 ~ 1000 cm²
-        if (swayAreaM2 < 0.20)  return 'moderate';  // 1000 ~ 2000 cm²
-        return 'severe';                             // > 2000 cm²
+        if (swayAreaM2 < 0.20)  return 'mild';      // 500 ~ 2000 cm²
+        if (swayAreaM2 < 1.00)  return 'moderate';  // 2000 ~ 10000 cm²
+        return 'severe';                             // > 10000 cm²
     }
 
     const balanceGradeText  = { normal: '正常', mild: '轻度异常', moderate: '中度异常', severe: '重度异常' };
