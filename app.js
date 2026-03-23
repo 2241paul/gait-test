@@ -818,8 +818,13 @@
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         if (!isMobile) {
             statusText.textContent = '请使用手机浏览器打开此页面以获取传感器数据';
-            startBtn.disabled = true;
-            startBtn.style.opacity = '0.5';
+            // 禁用三个测试按钮
+            testBtn1.disabled = true;
+            testBtn2.disabled = true;
+            testBtn3.disabled = true;
+            testBtn1.style.opacity = '0.5';
+            testBtn2.style.opacity = '0.5';
+            testBtn3.style.opacity = '0.5';
         }
     }
 
