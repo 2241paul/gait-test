@@ -65,17 +65,31 @@ class DataExport {
      * 导出单次测试的特征为CSV
      * @param {Object} record - 包含features的对象
      * @param {string} filename - 文件名
+     * @param {Object} patientInfo - 患者信息
      */
-    exportFeaturesCSV(record, filename = 'gait_features') {
+    exportFeaturesCSV(record, filename = 'gait_features', patientInfo = null) {
         const features = record.features || {};
         const now = new Date().toISOString();
 
         // UTF-8 BOM头，确保Excel正确识别中文
         const bom = '\uFEFF';
 
+        const rows = [];
+
+        // 患者信息放在最前面
+        if (patientInfo) {
+            rows.push('"患者信息","",""');
+            if (patientInfo.name) rows.push(`"姓名","${patientInfo.name}","${now}"`);
+            if (patientInfo.gender) rows.push(`"性别","${patientInfo.gender}","${now}"`);
+            if (patientInfo.age) rows.push(`"年龄","${patientInfo.age}","${now}"`);
+            if (patientInfo.id) rows.push(`"住院号","${patientInfo.id}","${now}"`);
+            if (patientInfo.diagnosis) rows.push(`"初步诊断","${patientInfo.diagnosis}","${now}"`);
+            rows.push('');
+        }
+
         // 表头
         const headers = ['参数名', '参数值', '记录时间'];
-        const rows = [headers.join(',')];
+        rows.push(headers.join(','));
 
         // 按分类排序
         const categories = {
@@ -124,6 +138,7 @@ class DataExport {
 
         const csv = bom + rows.join('\n');
         this._downloadFile(csv, `${filename}.csv`, 'text/csv;charset=utf-8');
+        return csv; // 返回csv内容用于邮件发送
     }
 
     /**

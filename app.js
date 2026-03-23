@@ -327,10 +327,11 @@
 
         // 保存历史记录（通过 DataExport 模块）
         dataExport.saveRecord({
-            features: currentResult.params,
-            featureCount: Object.keys(currentResult.params).length,
+            features: currentResult.features,
+            featureCount: Object.keys(currentResult.features).length,
             mjPrediction: currentResult.mjPrediction,
             duration: currentResult.duration,
+            patientInfo: getPatientInfo(),
             rawData: currentRawData // 仅用于导出，不存入 localStorage
         });
 
@@ -463,14 +464,80 @@
     }
 
     // ============================================================
+    // 获取患者信息
+    // ============================================================
+    function getPatientInfo() {
+        return {
+            name: $('patientName').value.trim(),
+            gender: $('patientGender').value,
+            age: $('patientAge').value.trim(),
+            id: $('patientId').value.trim(),
+            diagnosis: $('patientDiagnosis').value.trim()
+        };
+    }
+
+    // ============================================================
     // CSV 导出（委托给 DataExport 模块）
     // ============================================================
     function exportCSV() {
         if (!currentResult) return;
+        const patientInfo = getPatientInfo();
         dataExport.exportFeaturesCSV({
             features: currentResult.features,
             mjPrediction: currentResult.mjPrediction
-        }, `gaitomics_${formatTimestamp(new Date())}`);
+        }, `gaitomics_${formatTimestamp(new Date())}`, patientInfo);
+    }
+
+    // ============================================================
+    // 邮件发送（使用mailto协议唤起本地邮件客户端）
+    // ============================================================
+    function sendEmail() {
+        if (!currentResult) {
+            alert('请先完成测试再发送邮件');
+            return;
+        }
+        const emailAddr = $('emailAddress').value.trim();
+        if (!emailAddr || !emailAddr.includes('@')) {
+            alert('请输入有效的邮箱地址');
+            return;
+        }
+
+        // 生成CSV内容但不下载，用于邮件附件
+        const patientInfo = getPatientInfo();
+        const csvContent = dataExport.exportFeaturesCSV({
+            features: currentResult.features,
+            mjPrediction: currentResult.mjPrediction
+        }, `gaitomics_${formatTimestamp(new Date())}`, patientInfo);
+
+        // 构建mailto链接
+        // 注意：mailto对附件大小有限制，一般几KB可以，太大无法附件
+        // 所以我们把CSV内容放在正文里，收件人填写用户输入
+        const patientStr = [
+            patientInfo.name ? `姓名：${patientInfo.name}` : '',
+            patientInfo.gender ? `性别：${patientInfo.gender}` : '',
+            patientInfo.age ? `年龄：${patientInfo.age}岁` : '',
+            patientInfo.id ? `住院号：${patientInfo.id}` : '',
+            patientInfo.diagnosis ? `初步诊断：${patientInfo.diagnosis}` : ''
+        ].filter(s => s).join('%0D%0A');
+
+        const mjScore = currentResult.mjPrediction ? currentResult.mjPrediction.score : 'N/A';
+        const mjDesc = currentResult.mjPrediction ? currentResult.mjPrediction.description : '';
+        const stepCount = currentResult.features ? currentResult.features.step_count : 'N/A';
+        const stepFreq = currentResult.features ? (currentResult.features.step_frequency * 60).toFixed(1) : 'N/A';
+
+        let body = `${patientStr}%0D%0A%0D%0A`;
+        body += `测试结果：%0D%0A`;
+        body += `步数：${stepCount} 步%0D%0A`;
+        body += `步频：${stepFreq} 步/分钟%0D%0A`;
+        body += `mJOA下肢评分：${mjScore}/4 (${mjDesc})%0D%0A%0D%0A`;
+        body += `完整CSV数据见附件。由于浏览器限制，如果附件没有显示，请手动复制下方CSV内容保存：%0D%0A%0D%0A`;
+        body += encodeURIComponent(csvContent);
+
+        const subject = encodeURIComponent(`GaitOmics步态分析报告 - ${patientInfo.name || '未命名'}`);
+        const mailtoUrl = `mailto:${emailAddr}?subject=${subject}&body=${body}`;
+
+        // 打开mailto链接，唤起系统默认邮件客户端
+        window.location.href = mailtoUrl;
     }
 
     // ============================================================
@@ -665,6 +732,7 @@
         toggleParamGroup,
         exportCSV,
         exportJSON,
+        sendEmail,
         viewHistoryDetail,
         clearHistory
     };

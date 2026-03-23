@@ -15,6 +15,43 @@
         </header>
 
         <main>
+            <!-- 个人信息表单 -->
+            <div class="info-card" id="patientInfoCard">
+                <h3>患者信息</h3>
+                <div class="patient-info-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="patientName">姓名</label>
+                            <input type="text" id="patientName" placeholder="请输入姓名">
+                        </div>
+                        <div class="form-group">
+                            <label for="patientGender">性别</label>
+                            <select id="patientGender">
+                                <option value="">请选择</option>
+                                <option value="男">男</option>
+                                <option value="女">女</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="patientAge">年龄</label>
+                            <input type="number" id="patientAge" placeholder="岁" min="1" max="120">
+                        </div>
+                        <div class="form-group">
+                            <label for="patientId">住院号</label>
+                            <input type="text" id="patientId" placeholder="请输入住院号">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group form-group-full">
+                            <label for="patientDiagnosis">初步诊断</label>
+                            <input type="text" id="patientDiagnosis" placeholder="请输入初步诊断">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 主测试区：大圆圈倒计时 -->
             <div class="status-card" id="statusCard">
                 <div class="timer-circle" id="timerCircle">
@@ -123,6 +160,11 @@
                 <div class="export-group">
                     <button class="btn-export" onclick="app.exportCSV()">导出CSV</button>
                     <button class="btn-export" onclick="app.exportJSON()">导出原始数据</button>
+                </div>
+                <!-- 邮件发送 -->
+                <div class="email-group">
+                    <input type="email" id="emailAddress" placeholder="请输入邮箱地址">
+                    <button class="btn-email" onclick="app.sendEmail()">发送报告</button>
                 </div>
             </div>
 
