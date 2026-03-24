@@ -837,6 +837,62 @@ main {
     flex: 1;
     padding: 10px 12px;
     border: 1px solid var(--border-color);
+}
+
+/* ===== 零点校准 ===== */
+.calibration-row {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-calibration {
+    padding: 12px 24px;
+    background: var(--secondary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.btn-calibration:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+.btn-calibration.calibrating {
+    background: var(--accent-color);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.btn-calibration small {
+    font-weight: 400;
+    opacity: 0.9;
+}
+
+.calibration-status {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.calibration-status.calibrated {
+    color: var(--secondary-color);
+    font-weight: 600;
+}
     border-radius: var(--radius-sm);
     font-size: 0.9375rem;
 }

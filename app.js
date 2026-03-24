@@ -24,8 +24,113 @@
     // 三次测试结果存储
     let tripleResults = [null, null, null]; // [test1, test2, test3]
 
+    // 零点校准（V1.3新增：用户手动长按校准零点）
+    // calibration = { acc: {x, y, z}, count } → 平均偏移
+    let zeroCalibration = {
+        accX: 0, accY: 0, accZ: 0,
+        count: 0
+    };
+    let isCalibrating = false;
+    let calibrationTimer = null;
+
     // 简单获取DOM：每次使用都重新获取，永远不会null
     const $ = (id) => document.getElementById(id);
+
+    // ============================================================
+    // 零点校准 - 用户长按三秒
+    // ============================================================
+    function startCalibration() {
+        if (isTesting) return;
+        isCalibrating = true;
+        const btn = $('calibrationBtn');
+        const status = $('calibrationStatus');
+        
+        // 重置校准数据
+        zeroCalibration = {
+            accX: 0, accY: 0, accZ: 0,
+            count: 0
+        };
+        
+        // 更新UI
+        if (btn) btn.classList.add('calibrating');
+        if (status) {
+            status.textContent = '正在校准...请保持静止';
+            status.classList.remove('calibrated');
+        }
+        
+        // 自动三秒后结束校准
+        calibrationTimer = setTimeout(() => {
+            finishCalibration();
+        }, 3000);
+        
+        // 开始传感器采集校准数据
+        if (!sensorManager.isRunning) {
+            sensorManager.clearData();
+            sensorManager.startSensors();
+            
+            // 猴子补丁：在推送数据时累积校准样本
+            const originalPush = sensorManager._pushDataPoint.bind(sensorManager);
+            sensorManager._pushDataPoint = function(type, x, y, z) {
+                // 调用原始方法
+                originalPush(type, x, y, z);
+                // 如果正在校准且是加速度数据，累积样本
+                if (isCalibrating && type === 'accel') {
+                    zeroCalibration.accX += x;
+                    zeroCalibration.accY += y;
+                    zeroCalibration.accZ += z;
+                    zeroCalibration.count++;
+                }
+            };
+        }
+    }
+    
+    function finishCalibration() {
+        if (!isCalibrating) return;
+        isCalibrating = false;
+        
+        if (calibrationTimer) {
+            clearTimeout(calibrationTimer);
+            calibrationTimer = null;
+        }
+        
+        const btn = $('calibrationBtn');
+        const status = $('calibrationStatus');
+        
+        // 计算平均偏移
+        if (zeroCalibration.count > 0) {
+            zeroCalibration.accX /= zeroCalibration.count;
+            zeroCalibration.accY /= zeroCalibration.count;
+            zeroCalibration.accZ /= zeroCalibration.count;
+        }
+        
+        // 停止传感器
+        sensorManager.stopSensors();
+        
+        // 更新UI
+        if (btn) btn.classList.remove('calibrating');
+        if (status) {
+            if (zeroCalibration.count > 0) {
+                status.textContent = `✅ 校准完成 (${zeroCalibration.count} 样本)`;
+                status.classList.add('calibrated');
+            } else {
+                status.textContent = '❌ 校准失败，请重试';
+                status.classList.remove('calibrated');
+            }
+        }
+    }
+    
+    // 导出到全局供onmousedown/ontouchstart调用
+    window.app = {
+        startTest: startTest,
+        startCalibration: startCalibration,
+        finishCalibration: finishCalibration,
+        editSteps: editSteps,
+        toggleDetailParams: toggleDetailParams,
+        toggleParamGroup: toggleParamGroup,
+        resetAllTests: resetAllTests,
+        exportCSV: exportCSV,
+        sendEmail: sendEmail
+    };
 
     const WAVEFORM_WINDOW = 2000; // 显示最近2秒数据
     const WAVEFORM_UPDATE_INTERVAL = 50; // 50ms更新一次
@@ -197,12 +302,18 @@
         if (timerCircle) timerCircle.className = 'timer-circle preparing';
         if (timerDisplay) timerDisplay.textContent = count;
         if (timerDisplay) timerDisplay.classList.add('timer-counting');
-        if (statusText) statusText.textContent = '准备...';
+        if (statusText) statusText.textContent = '请保持稳定...零点校准中';
         if (resetBtn) resetBtn.style.display = 'none';
         if (resultsCard) resultsCard.style.display = 'none';
 
+        // V1.3新增：重置零点校准
+        zeroCalibration = {
+            accX: 0, accY: 0, accZ: 0,
+            count: 0
+        };
+
         // 语音提示：三
-        speak('三');
+        speak('三，请保持稳定');
 
         prepareTimer = setInterval(() => {
             count--;
@@ -216,12 +327,18 @@
                 }
                 // 语音
                 const nums = { 2: '二', 1: '一' };
-                speak(nums[count]);
+                speak(nums[count] + '，请保持稳定');
             } else {
-                // 准备结束，开始测试
+                // 准备结束，计算平均零点偏移，开始测试
                 clearInterval(prepareTimer);
                 prepareTimer = null;
                 isPreparing = false;
+                // 计算平均偏移
+                if (zeroCalibration.count > 0) {
+                    zeroCalibration.accX /= zeroCalibration.count;
+                    zeroCalibration.accY /= zeroCalibration.count;
+                    zeroCalibration.accZ /= zeroCalibration.count;
+                }
                 beginTesting();
             }
         }, 1000);
@@ -314,6 +431,19 @@
             alert('采集数据太少，请重新测试，确保手机传感器正常工作');
             resetTestUI();
             return;
+        }
+
+        // V1.3新增：应用零点校准（如果有校准）
+        if (zeroCalibration.count > 0) {
+            currentRawData = currentRawData.map(point => {
+                if (point.type !== 'accel') return point;
+                return {
+                    ...point,
+                    x: point.x - zeroCalibration.accX,
+                    y: point.y - zeroCalibration.accY,
+                    z: point.z - zeroCalibration.accZ
+                };
+            });
         }
 
         // 分析数据
