@@ -36,6 +36,9 @@
     // 简单获取DOM：每次使用都重新获取，永远不会null
     const $ = (id) => document.getElementById(id);
 
+    // 立即导出到全局（必须在任何函数引用之前定义，供HTML的onmousedown使用）
+    window.app = {};
+
     // ============================================================
     // 零点校准 - 用户长按三秒
     // ============================================================
@@ -119,7 +122,7 @@
         }
     }
     
-    // 导出到全局供onmousedown/ontouchstart调用
+    // 填充导出到全局的app对象（在所有函数定义之后执行）
     window.app = {
         startTest: startTest,
         startCalibration: startCalibration,
