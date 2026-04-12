@@ -302,18 +302,12 @@
         if (timerCircle) timerCircle.className = 'timer-circle preparing';
         if (timerDisplay) timerDisplay.textContent = count;
         if (timerDisplay) timerDisplay.classList.add('timer-counting');
-        if (statusText) statusText.textContent = '请保持稳定...零点校准中';
+        if (statusText) statusText.textContent = '请保持稳定，准备开始...';
         if (resetBtn) resetBtn.style.display = 'none';
         if (resultsCard) resultsCard.style.display = 'none';
 
-        // V1.3新增：重置零点校准
-        zeroCalibration = {
-            accX: 0, accY: 0, accZ: 0,
-            count: 0
-        };
-
         // 语音提示：三
-        speak('三，请保持稳定');
+        speak('三，准备开始');
 
         prepareTimer = setInterval(() => {
             count--;
@@ -327,18 +321,12 @@
                 }
                 // 语音
                 const nums = { 2: '二', 1: '一' };
-                speak(nums[count] + '，请保持稳定');
+                speak(nums[count] + '，准备开始');
             } else {
-                // 准备结束，计算平均零点偏移，开始测试
+                // 准备结束，开始测试（不重新校准，使用"长按三秒校准"按钮的校准结果）
                 clearInterval(prepareTimer);
                 prepareTimer = null;
                 isPreparing = false;
-                // 计算平均偏移
-                if (zeroCalibration.count > 0) {
-                    zeroCalibration.accX /= zeroCalibration.count;
-                    zeroCalibration.accY /= zeroCalibration.count;
-                    zeroCalibration.accZ /= zeroCalibration.count;
-                }
                 beginTesting();
             }
         }, 1000);
