@@ -36,84 +36,92 @@
     // 简单获取DOM：每次使用都重新获取，永远不会null
     const $ = (id) => document.getElementById(id);
 
-    // 立即导出到全局（必须在任何函数引用之前定义，供HTML的onmousedown使用）
-    window.app = {};
-
     // ============================================================
     // 零点校准 - 用户长按三秒
     // ============================================================
     function startCalibration() {
-        if (isTesting) return;
+        console.log('[校准] startCalibration 被调用');
+        if (isTesting) {
+            console.log('[校准] isTesting=true，拒绝校准');
+            return;
+        }
         isCalibrating = true;
+
         const btn = $('calibrationBtn');
         const status = $('calibrationStatus');
-        
-        // 重置校准数据
-        zeroCalibration = {
-            accX: 0, accY: 0, accZ: 0,
-            count: 0
-        };
-        
+
+        // 重置校准数据（使用SensorManager内置的校准属性）
+        sensorManager._calAccX = 0;
+        sensorManager._calAccY = 0;
+        sensorManager._calAccZ = 0;
+        sensorManager._calCount = 0;
+        zeroCalibration.count = 0;
+
         // 更新UI
         if (btn) btn.classList.add('calibrating');
         if (status) {
             status.textContent = '正在校准...请保持静止';
             status.classList.remove('calibrated');
         }
-        
+
         // 自动三秒后结束校准
         calibrationTimer = setTimeout(() => {
+            console.log('[校准] 3秒到，调用finishCalibration');
             finishCalibration();
         }, 3000);
-        
-        // 开始传感器采集校准数据
-        if (!sensorManager.isRunning) {
-            sensorManager.clearData();
-            sensorManager.startSensors();
-            
-            // 猴子补丁：在推送数据时累积校准样本
-            const originalPush = sensorManager._pushDataPoint.bind(sensorManager);
-            sensorManager._pushDataPoint = function(type, x, y, z) {
-                // 调用原始方法
-                originalPush(type, x, y, z);
-                // 如果正在校准且是加速度数据，累积样本
-                if (isCalibrating && type === 'accel') {
-                    zeroCalibration.accX += x;
-                    zeroCalibration.accY += y;
-                    zeroCalibration.accZ += z;
-                    zeroCalibration.count++;
-                }
-            };
+
+        // 启动传感器采集校准数据（使用SensorManager内置校准模式）
+        sensorManager.clearData();
+        const ok = sensorManager.startSensors();
+        console.log('[校准] sensorManager.startSensors() =', ok);
+        if (ok) {
+            // 开启SensorManager内置校准模式
+            sensorManager._isCalibrating = true;
+            console.log('[校准] 已开启内置校准模式，等待数据...');
+        } else {
+            console.log('[校准] 传感器启动失败！');
         }
     }
-    
+
     function finishCalibration() {
-        if (!isCalibrating) return;
+        console.log('[校准] finishCalibration 被调用');
+        if (!isCalibrating) {
+            console.log('[校准] isCalibrating=false，跳过');
+            return;
+        }
         isCalibrating = false;
-        
+
         if (calibrationTimer) {
             clearTimeout(calibrationTimer);
             calibrationTimer = null;
         }
-        
+
+        // 关闭SensorManager内置校准模式
+        sensorManager._isCalibrating = false;
+
         const btn = $('calibrationBtn');
         const status = $('calibrationStatus');
-        
-        // 计算平均偏移
-        if (zeroCalibration.count > 0) {
-            zeroCalibration.accX /= zeroCalibration.count;
-            zeroCalibration.accY /= zeroCalibration.count;
-            zeroCalibration.accZ /= zeroCalibration.count;
+
+        // 从SensorManager获取校准结果
+        const count = sensorManager._calCount;
+        if (count > 0) {
+            zeroCalibration.accX = sensorManager._calAccX / count;
+            zeroCalibration.accY = sensorManager._calAccY / count;
+            zeroCalibration.accZ = sensorManager._calAccZ / count;
+            zeroCalibration.count = count;
+            console.log('[校准] 校准完成，样本数:', count, '偏移:', zeroCalibration.accX.toFixed(4), zeroCalibration.accY.toFixed(4), zeroCalibration.accZ.toFixed(4));
+        } else {
+            console.log('[校准] 校准失败：无数据样本');
         }
-        
+
         // 停止传感器
         sensorManager.stopSensors();
-        
+
         // 更新UI
         if (btn) btn.classList.remove('calibrating');
         if (status) {
-            if (zeroCalibration.count > 0) {
-                status.textContent = `✅ 校准完成 (${zeroCalibration.count} 样本)`;
+            if (count > 0) {
+                status.textContent = '✅ 校准完成 (' + count + ' 样本)';
                 status.classList.add('calibrated');
             } else {
                 status.textContent = '❌ 校准失败，请重试';
@@ -121,17 +129,10 @@
             }
         }
     }
-    
-    // 填充导出到全局的app对象（在所有函数定义之后执行）
-    window.app = {
-        startTest: startTest,
-        startCalibration: startCalibration,
-        finishCalibration: finishCalibration,
-        editSteps: editSteps,
-        toggleDetailParams: toggleDetailParams,
-        toggleParamGroup: toggleParamGroup,
-        resetAllTests: resetAllTests,
-        exportCSV: exportCSV,
+
+    // ============================================================
+    // 其余函数定义
+    // ============================================================
         sendEmail: sendEmail
     };
 
@@ -1039,7 +1040,30 @@
         exportJSON,
         sendEmail,
         viewHistoryDetail,
-        clearHistory
+        clearHistory,
+        // 校准接口
+        startCalibration,
+        finishCalibration
     };
+
+    // ============================================================
+    // 绑定校准按钮事件（使用addEventListener，比HTML内联更可靠）
+    // ============================================================
+    const calibrationBtn = document.getElementById('calibrationBtn');
+    if (calibrationBtn) {
+        calibrationBtn.addEventListener('mousedown', startCalibration);
+        calibrationBtn.addEventListener('touchstart', function(e) {
+            e.preventDefault(); // 阻止触摸的mousedown默认行为
+            startCalibration();
+        });
+        calibrationBtn.addEventListener('mouseup', finishCalibration);
+        calibrationBtn.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            finishCalibration();
+        });
+        console.log('[校准] 按钮事件绑定成功');
+    } else {
+        console.error('[校准] 找不到 calibrationBtn 元素！');
+    }
 
 })();

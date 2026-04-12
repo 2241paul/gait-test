@@ -17,6 +17,13 @@ class SensorManager {
         // DeviceMotion原始数据缓冲
         this._dmAccelBuffer = [];
         this._dmGyroBuffer = [];
+
+        // 校准模式（内置支持，避免猴子补丁）
+        this._isCalibrating = false;
+        this._calAccX = 0;
+        this._calAccY = 0;
+        this._calAccZ = 0;
+        this._calCount = 0;
         this._dmAccelWithGravity = null;
         this._dmLastTimestamp = null;
         this._dmProcessingTimer = null;
@@ -616,16 +623,24 @@ class SensorManager {
      */
     _pushDataPoint(type, x, y, z) {
         if (!this.startTime) return;
-        
+
         const now = Date.now();
         const t = (now - this.startTime) / 1000; // 从开始的秒数
-        
+
         // 坐标变换（陀螺仪和加速度都需要）
         const transformed = this._transformToENu(x, y, z);
-        
+
+        // 校准模式：累积变换后的加速度样本
+        if (this._isCalibrating && type === 'accel') {
+            this._calAccX += transformed.x;
+            this._calAccY += transformed.y;
+            this._calAccZ += transformed.z;
+            this._calCount++;
+        }
+
         // 质控：信号饱和检测
         const isSaturated = this._checkSaturation(transformed, type);
-        
+
         const point = {
             timestamp: now,
             type: type,
