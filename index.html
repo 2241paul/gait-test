@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GaitOmics - 步态组学 | 10秒踵趾步态平衡测试 V1.3</title>
+    <title>10s-TandemGait - 一字步平衡测试 V2.1</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <!-- 头部 -->
         <header>
-            <h1>GaitOmics - 步态组学</h1>
-            <p class="subtitle">10秒踵趾步态平衡测试 <span class="version-badge">V1.3</span></p>
+            <h1>10s-TandemGait - 一字步平衡测试</h1>
+            <p class="subtitle">步态平衡评估工具 <span class="version-badge">V2.1</span></p>
         </header>
 
         <main>
@@ -98,7 +98,7 @@
                 <h2>当前测试结果</h2>
                 <div class="result-summary">
                     <div class="result-item">
-                        <span class="result-label">总步数</span>
+                        <span class="result-label">总步数 <small style="color:#9ca3af;font-size:0.75em">(仅供参考)</small></span>
                         <div class="result-value-wrap">
                             <span class="result-value" id="stepsResult">-</span>
                             <button class="btn-edit" id="editStepsBtn" onclick="app.editSteps()">校正</button>
@@ -229,6 +229,7 @@
             <div class="info-card">
                 <h3>测试说明</h3>
                 <ul>
+                    <li><strong>热身：测试前请先热身练习行走一段路程，适应一字步行走方式</strong></li>
                     <li><strong>✋ 握持方式：右手握持手机，双臂自然外展张开，手掌向前，<u>屏幕朝向行走方向</u></strong></li>
                     <li><strong>🚶 行走方式：足跟贴紧足尖，沿直线缓慢行走</strong></li>
                     <li><strong>保持手机平稳，避免主动摆臂</strong></li>
@@ -253,7 +254,7 @@
         </main>
 
         <footer>
-            <p>GaitOmics 步态组学研究项目</p>
+            <p>10s-TandemGait 一字步平衡测试 V2.1</p>
         </footer>
     </div>
 

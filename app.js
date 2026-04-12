@@ -437,13 +437,24 @@
         // 分析数据
         try {
             currentResult = gaitAnalyzer.analyze(currentRawData);
-            displayResults(currentResult);
         } catch (e) {
             console.error('分析出错:', e);
             alert('分析出错：' + e.message);
             resetTestUI();
             return;
         }
+
+        // V2.1新增：信号质量门控
+        const qualityScore = currentResult.features.signal_quality_score || 0;
+        if (qualityScore < 70) {
+            const proceed = confirm(`信号质量评分偏低（${qualityScore}分），建议重新测试。\n\n点击"确定"仍可保存当前结果，点击"取消"重新测试。`);
+            if (!proceed) {
+                resetTestUI();
+                return;
+            }
+        }
+
+        displayResults(currentResult);
 
         // 显示UI
         if (resultsCard) resultsCard.style.display = 'block';
@@ -510,7 +521,8 @@
     function computeAverageAndFinalize() {
         const keysToAvg = ['step_count', 'step_frequency', 'step_time_mean', 'step_time_std',
                            'sway_area', 'sway_path_length', 'acc_total_std',
-                           'sample_entropy', 'signal_quality_score'];
+                           'sample_entropy', 'signal_quality_score',
+                           'sway_area_log', 'vert_acc_mean_log', 'ml_acc_mean_log', 'ap_acc_mean_log'];
 
         const avgFeatures = {};
         keysToAvg.forEach(key => {

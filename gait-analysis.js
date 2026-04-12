@@ -44,6 +44,28 @@ class GaitAnalyzer {
             ...quality
         };
 
+        // 6. V2.1新增：对数变换双输出（用于改善偏态参数的统计特性）
+        if (allFeatures.sway_area !== undefined && allFeatures.sway_area > 0) {
+            allFeatures.sway_area_log = Math.log10(allFeatures.sway_area);
+        } else {
+            allFeatures.sway_area_log = null;
+        }
+        if (allFeatures.vert_acc_mean !== undefined && allFeatures.vert_acc_mean > 0) {
+            allFeatures.vert_acc_mean_log = Math.log10(Math.abs(allFeatures.vert_acc_mean));
+        } else {
+            allFeatures.vert_acc_mean_log = null;
+        }
+        if (allFeatures.ml_acc_mean !== undefined && allFeatures.ml_acc_mean > 0) {
+            allFeatures.ml_acc_mean_log = Math.log10(Math.abs(allFeatures.ml_acc_mean));
+        } else {
+            allFeatures.ml_acc_mean_log = null;
+        }
+        if (allFeatures.ap_acc_mean !== undefined && allFeatures.ap_acc_mean > 0) {
+            allFeatures.ap_acc_mean_log = Math.log10(Math.abs(allFeatures.ap_acc_mean));
+        } else {
+            allFeatures.ap_acc_mean_log = null;
+        }
+
         return {
             features: allFeatures,
             featureCount: Object.keys(allFeatures).length,
